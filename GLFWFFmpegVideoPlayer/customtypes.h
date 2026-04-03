@@ -6,6 +6,7 @@ struct AppState
 {
     int activeIndex = 0;
     int previousIndex = -1;
+    int lastForegroundIndex = 0;
     bool interruptRead = false;
     std::vector<VideoSource*> sources;
     GLRenderer* renderer = nullptr;

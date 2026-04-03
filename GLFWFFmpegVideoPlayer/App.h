@@ -30,7 +30,7 @@ public:
         {
             VideoSource* videoSource = new VideoSource();
             if (videoSource->Open(videoContent.filename, hw_ctx)) {
-                // Apply individual fade timings from the playlist
+                // Apply separate fade timings
                 videoSource->SetFadeInDuration(videoContent.fadeInDuration);
                 videoSource->SetFadeOutDuration(videoContent.fadeOutDuration);
                 state.sources.push_back(videoSource);
@@ -73,7 +73,7 @@ public:
             VideoSource& background = *state.sources[0];
             if (!background.IsPaused()) {
                 if (background.GetStartTime() <= 0) background.SetStartTime(glfwGetTime());
-                // Background renders in Slot 1 at full opacity
+                // Background always renders in Slot 1 at full opacity
                 UpdateAndDraw(background, 1.0f, 1);
             }
 
@@ -87,8 +87,8 @@ public:
                 double elapsed = currentTime - foreground.GetAdjustedStartTime();
                 double totalDuration = foreground.GetDurationInSeconds(); //
 
-                float inDur = foreground.GetFadeInDuration(); //
-                float outDur = foreground.GetFadeOutDuration(); //
+                float inDur = foreground.GetFadeInDuration();
+                float outDur = foreground.GetFadeOutDuration();
                 float alpha = 1.0f;
 
                 // Fade In Logic
@@ -149,11 +149,12 @@ private:
             else {
                 // End of stream handling
                 if (state.activeIndex != 0 && &source == state.sources[state.activeIndex]) {
-                    // Drain the decoder before switching back to background to prevent glitches
+                    // Drain the decoder before switching back to background
                     avcodec_send_packet(source.GetCodecCtx(), NULL);
                     while (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) { av_frame_unref(frm); }
 
-                    state.activeIndex = 0; // Return to background
+                    state.activeIndex = 0; // Return to background view
+                    // Note: state.lastForegroundIndex is NOT reset here, preserving memory
                 }
                 else {
                     // Loop background without resetting fade timer
@@ -169,14 +170,26 @@ private:
 
         if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_LEFT) {
             int dir = (key == GLFW_KEY_RIGHT) ? 1 : -1;
-            int nextIdx = state.activeIndex + dir;
+            int numSources = (int)state.sources.size();
 
-            // Cycle through foreground videos, skipping index 0 (background)
-            if (nextIdx >= (int)state.sources.size()) nextIdx = 1;
-            if (nextIdx < 1) nextIdx = (int)state.sources.size() - 1;
+            if (numSources <= 1) return;
+
+            int nextIdx;
+            if (state.lastForegroundIndex == 0) {
+                // First time press: always start with the first foreground video
+                nextIdx = 1;
+            }
+            else {
+                // Normal cycling logic
+                nextIdx = state.lastForegroundIndex + dir;
+                if (nextIdx >= numSources) nextIdx = 1;
+                if (nextIdx < 1) nextIdx = numSources - 1;
+            }
 
             state.activeIndex = nextIdx;
-            state.sources[state.activeIndex]->Restart(glfwGetTime(), true); // Reset timer for Fade In
+            state.lastForegroundIndex = nextIdx;
+
+            state.sources[state.activeIndex]->Restart(glfwGetTime(), true);
         }
 
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
