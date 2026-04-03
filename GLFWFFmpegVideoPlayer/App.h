@@ -77,9 +77,17 @@ public:
     {
         // 6. Main Execution Loop
         while (!renderer->ShouldClose()) {
-            state.interruptRead = false;
+            
             VideoSource& current = *state.sources[state.activeIndex];
 
+            if (current.IsPaused())
+            {
+                renderer->PollEvents();
+                Sleep(10);
+                continue;
+            }
+
+            state.interruptRead = false;
             // Sync check
             if (current.GetStartTime() <= 0) {
                 current.SetStartTime(glfwGetTime());
@@ -97,7 +105,7 @@ public:
 
                         // Synchronization logic
                         double pts = frm->pts * av_q2d(current.GetFmtCtx()->streams[current.GetStreamIdx()]->time_base);
-                        double elapsed = glfwGetTime() - current.GetStartTime();
+                        double elapsed = glfwGetTime() - current.GetAdjustedStartTime();
                         if (pts > elapsed) {
                             if (pts - elapsed > 0.002) Sleep((DWORD)((pts - elapsed) * 1000));
                         }
@@ -159,6 +167,10 @@ private:
             state.interruptRead = true;
             state.sources[state.activeIndex]->Restart(glfwGetTime());
             std::cout << "Switched to: " << state.sources[state.activeIndex]->GetFilename() << std::endl;
+        }
+
+        if (key == GLFW_KEY_SPACE) {
+            state.sources[state.activeIndex]->TogglePause(glfwGetTime());
         }
     }
 

@@ -17,8 +17,13 @@ private:
 	AVCodecContext* codecCtx = nullptr;
 	int streamID = -1;
 	double startTime = 0;
+	// Time when the pause started
+	double pauseTime = 0;
+	//Cumulative time spent paused
+	double totalPausedTime = 0;
 	std::string filename;
 	bool isInitialized = false;
+	bool isPaused = false;
 
 public:
 	VideoSource() = default;
@@ -66,6 +71,23 @@ public:
 		return true;
 	}
 
+	void TogglePause(double currentGLFWTime)
+	{
+		if (!isInitialized)
+			return;
+
+		if (!isPaused)
+		{
+			pauseTime = currentGLFWTime;
+			isPaused = true;
+		}
+		else
+		{
+			totalPausedTime += (currentGLFWTime - pauseTime);
+			isPaused = false;
+		}
+	}
+
 	// Seek to beginning and reset timing
 	void Restart(double currentGLFWTime)
 	{
@@ -80,6 +102,12 @@ public:
 
 		// Reset our synchronization anchor
 		startTime = currentGLFWTime;
+		//Reset pause anchor
+		pauseTime = 0;
+		//Reset cumulative pause
+		totalPausedTime = 0;
+		//Ensure it starts playing
+		isPaused = false;
 	}
 
 	void Close() 
@@ -101,4 +129,8 @@ public:
 	void SetStartTime(double t) { startTime = t; }
 	std::string GetFilename() const { return filename; }
 	bool Initialized() const { return isInitialized; }
+	bool IsPaused() const { return isPaused; }
+	double GetAdjustedStartTime() const {
+		return startTime + totalPausedTime;
+	}
 };
