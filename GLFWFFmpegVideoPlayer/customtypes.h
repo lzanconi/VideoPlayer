@@ -2,9 +2,15 @@
 #include "VideoSource.h"
 #include "GLRenderer.h"
 
-struct AppState {
+struct AppState 
+{
     int activeIndex = 0;
     bool interruptRead = false;
     VideoSource sources[2];
     GLRenderer* renderer = nullptr;
+};
+
+struct VideoResource
+{
+    std::string filename;
 };
