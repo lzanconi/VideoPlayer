@@ -69,37 +69,29 @@ public:
         while (!renderer->ShouldClose()) {
             renderer->PollEvents();
 
-            VideoSource& current = *state.sources[state.activeIndex];
-            if (current.IsPaused()) {
-                Sleep(10);
-                continue;
+            // 1. Handle Background (Always index 0)
+            VideoSource& background = *state.sources[0];
+            if (!background.IsPaused()) {
+                if (background.GetStartTime() <= 0) background.SetStartTime(glfwGetTime());
+                // Always update and draw background in Slot 1 at full opacity
+                UpdateAndDraw(background, 1.0f, 1);
             }
 
-            if (current.GetStartTime() <= 0) {
-                current.SetStartTime(glfwGetTime());
+            // 2. Handle Foreground (If active index is not 0)
+            if (state.activeIndex != 0) {
+                VideoSource& foreground = *state.sources[state.activeIndex];
+
+                if (foreground.GetStartTime() <= 0) foreground.SetStartTime(glfwGetTime());
+
+                double elapsed = glfwGetTime() - foreground.GetAdjustedStartTime();
+                float dur = foreground.GetFadeDuration();
+
+                // Calculate Alpha: Fade IN at start, and we'll handle Fade OUT at the end
+                float alpha = (dur > 0) ? (float)(elapsed / dur) : 1.0f;
+                if (alpha > 1.0f) alpha = 1.0f;
+
+                UpdateAndDraw(foreground, alpha, 0);
             }
-
-            // Calculate cross-fade alpha progress using the source's own duration
-            double elapsed = glfwGetTime() - current.GetAdjustedStartTime();
-            float currentFadeLimit = current.GetFadeDuration();
-            float alpha = (currentFadeLimit > 0) ? (float)(elapsed / currentFadeLimit) : 1.0f;
-
-            if (alpha >= 1.0f) {
-                alpha = 1.0f;
-                state.previousIndex = -1; // End the transition period
-            }
-
-            // --- RENDER PASS ---
-            glClear(GL_COLOR_BUFFER_BIT);
-
-            // 1. Render Background (Slot 1) if a transition is active
-            if (state.previousIndex != -1 && state.previousIndex != state.activeIndex) {
-                VideoSource& prev = *state.sources[state.previousIndex];
-                UpdateAndDraw(prev, 1.0f, 1); // Background is always fully opaque
-            }
-
-            // 2. Render Foreground (Slot 0)
-            UpdateAndDraw(current, alpha, 0);
 
             renderer->SwapBuffers();
         }
@@ -115,42 +107,45 @@ private:
     AVFrame* sw_frm = nullptr;
 
     // Helper to decode a frame and render it to a specific texture slot
+    // App.h
     void UpdateAndDraw(VideoSource& source, float alphaValue, int slot) {
         bool frameReady = false;
-
         while (!frameReady) {
-            int ret = av_read_frame(source.GetFmtCtx(), pkt); //
+            if (av_read_frame(source.GetFmtCtx(), pkt) >= 0) {
+                if (pkt->stream_index == source.GetStreamIdx()) {
+                    avcodec_send_packet(source.GetCodecCtx(), pkt);
+                    if (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) {
+                        av_hwframe_transfer_data(sw_frm, frm, 0);
 
-            if (ret >= 0) {
-                if (pkt->stream_index == source.GetStreamIdx()) { //
-                    avcodec_send_packet(source.GetCodecCtx(), pkt); //
-                    if (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) { //
-                        // Standard upload and render logic
-                        av_hwframe_transfer_data(sw_frm, frm, 0); //
-                        renderer->UpdateVideoTextures(slot, sw_frm->width, sw_frm->height,
+                        renderer->UpdateVideoTextures(slot,
+                            sw_frm->width, sw_frm->height,
                             sw_frm->linesize[0], sw_frm->data[0],
-                            sw_frm->linesize[1], sw_frm->data[1]); //
+                            sw_frm->linesize[1], sw_frm->data[1]
+                        );
 
-                        videoShader->Use(); //
-                        glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), alphaValue); //
-                        renderer->Render(videoShader->programID, slot); //
+                        videoShader->Use();
+                        glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), alphaValue);
+                        renderer->Render(videoShader->programID, slot);
 
-                        av_frame_unref(sw_frm); //
-                        av_frame_unref(frm); //
+                        av_frame_unref(sw_frm);
+                        av_frame_unref(frm);
                         frameReady = true;
                     }
                 }
-                av_packet_unref(pkt); //
+                av_packet_unref(pkt);
             }
             else {
-                // End of file reached: Drain decoder then Restart
-                avcodec_send_packet(source.GetCodecCtx(), NULL); // Enter draining mode
-                while (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) {
-                    // Optional: Render these last few frames to avoid a jump
-                    av_frame_unref(frm);
+                // End of Video Reached
+                if (state.activeIndex != 0 && &source == state.sources[state.activeIndex]) {
+                    // It's the foreground video: Switch back to background
+                    state.activeIndex = 0;
+                    // We don't call Restart here; let the Run loop handle the transition
                 }
-                // Restart without resetting the fade timer
-                source.Restart(glfwGetTime(), false);
+                else {
+                    // It's the background video: Loop normally
+                    source.Restart(glfwGetTime(), false);
+                }
+                frameReady = true;
             }
         }
     }
@@ -160,14 +155,12 @@ private:
 
         if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_LEFT) {
             int dir = (key == GLFW_KEY_RIGHT) ? 1 : -1;
-            int nextIdx = (state.activeIndex + dir) % (int)state.sources.size();
-            if (nextIdx < 0) nextIdx = (int)state.sources.size() - 1;
+            // Cycle through sources, but skip index 0 (the background)
+            int nextIdx = state.activeIndex + dir;
+            if (nextIdx >= (int)state.sources.size()) nextIdx = 1;
+            if (nextIdx < 1) nextIdx = (int)state.sources.size() - 1;
 
-            // Trigger cross-fade transition logic
-            state.previousIndex = state.activeIndex;
             state.activeIndex = nextIdx;
-
-            // Manual switch: Reset the timer to trigger a fresh fade-in
             state.sources[state.activeIndex]->Restart(glfwGetTime(), true);
         }
 
