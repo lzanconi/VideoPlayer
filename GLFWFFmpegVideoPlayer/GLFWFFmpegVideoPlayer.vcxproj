@@ -138,6 +138,8 @@ glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalD
     <ClCompile Include="wgl.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="App.h" />
+    <ClInclude Include="customtypes.h" />
     <ClInclude Include="GLRenderer.h" />
     <ClInclude Include="ShaderProgram.h" />
     <ClInclude Include="VideoSource.h" />

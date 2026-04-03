@@ -35,5 +35,11 @@
     <ClInclude Include="GLRenderer.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="App.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="customtypes.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
