@@ -44,6 +44,7 @@ public:
         pkt = av_packet_alloc();
         frm = av_frame_alloc();
         sw_frm = av_frame_alloc();
+
     }
 
     ~App()
@@ -69,12 +70,24 @@ public:
         while (!renderer->ShouldClose()) {
             renderer->PollEvents();
 
-            // 1. Handle Background (Always index 0)
+            // 1. Handle Background (Always index 0) with Frame-Rate Limiting
             VideoSource& background = *state.sources[0];
             if (!background.IsPaused()) {
                 if (background.GetStartTime() <= 0) background.SetStartTime(glfwGetTime());
-                // Background always renders in Slot 1 at full opacity
-                UpdateAndDraw(background, 1.0f, 1);
+
+                double playPos = background.GetCurrentPlayPosition(glfwGetTime());
+
+                // Only decode a new frame if the video time has advanced
+                if (playPos > state.lastBackgroundPTS) {
+                    UpdateAndDraw(background, 1.0f, 1);
+                    state.lastBackgroundPTS = playPos;
+                }
+                else {
+                    // Re-render existing texture to maintain VSync without stuttering
+                    videoShader->Use();
+                    glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), 1.0f);
+                    renderer->Render(videoShader->programID, 1);
+                }
             }
 
             // 2. Handle Foreground Interrupts
@@ -85,7 +98,7 @@ public:
 
                 double currentTime = glfwGetTime();
                 double elapsed = currentTime - foreground.GetAdjustedStartTime();
-                double totalDuration = foreground.GetDurationInSeconds(); //
+                double totalDuration = foreground.GetDurationInSeconds();
 
                 float inDur = foreground.GetFadeInDuration();
                 float outDur = foreground.GetFadeOutDuration();
@@ -108,6 +121,7 @@ public:
             }
 
             renderer->SwapBuffers();
+
         }
     }
 
@@ -154,11 +168,11 @@ private:
                     while (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) { av_frame_unref(frm); }
 
                     state.activeIndex = 0; // Return to background view
-                    // Note: state.lastForegroundIndex is NOT reset here, preserving memory
                 }
                 else {
                     // Loop background without resetting fade timer
                     source.Restart(glfwGetTime(), false);
+                    state.lastBackgroundPTS = -1.0; // Reset PTS tracker for smooth loop
                 }
                 frameReady = true;
             }
@@ -176,11 +190,9 @@ private:
 
             int nextIdx;
             if (state.lastForegroundIndex == 0) {
-                // First time press: always start with the first foreground video
-                nextIdx = 1;
+                nextIdx = 1; // Start with first foreground video
             }
             else {
-                // Normal cycling logic
                 nextIdx = state.lastForegroundIndex + dir;
                 if (nextIdx >= numSources) nextIdx = 1;
                 if (nextIdx < 1) nextIdx = numSources - 1;

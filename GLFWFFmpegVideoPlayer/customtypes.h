@@ -10,6 +10,7 @@ struct AppState
     bool interruptRead = false;
     std::vector<VideoSource*> sources;
     GLRenderer* renderer = nullptr;
+    double lastBackgroundPTS = -1.0;
 };
 
 struct VideoContent
