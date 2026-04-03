@@ -112,6 +112,10 @@
       <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swresample.lib;
 glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /y "$(ProjectDir)shader.vert" "$(OutDir)shader.vert"
+copy /y "$(ProjectDir)shader.frag" "$(OutDir)shader.frag"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -131,6 +135,10 @@ glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalD
       <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swresample.lib;
 glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /y "$(ProjectDir)shader.vert" "$(OutDir)shader.vert"
+copy /y "$(ProjectDir)shader.frag" "$(OutDir)shader.frag"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="gl.c" />
@@ -143,6 +151,18 @@ glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalD
     <ClInclude Include="GLRenderer.h" />
     <ClInclude Include="ShaderProgram.h" />
     <ClInclude Include="VideoSource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="shader.frag">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="shader.vert">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
