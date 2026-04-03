@@ -28,14 +28,14 @@ public:
             throw std::runtime_error("Failed to create HW Device Context");
         }
 
-        VideoResource videoResource1;
-        videoResource1.filename = "test.mp4";
-        VideoResource videoResource2;
-        videoResource2.filename = "Part1.mp4";
+        VideoContent content1;
+        content1.filename = "test.mp4";
+        VideoContent content2;
+        content2.filename = "Part1.mp4";
         // 4. Open Video Sources
-        if (!state.sources[0].Open(videoResource1.filename, hw_ctx)) 
+        if (!state.sources[0].Open(content1.filename, hw_ctx))
             throw std::runtime_error("Failed to open video 1");
-        if (!state.sources[1].Open(videoResource2.filename, hw_ctx)) 
+        if (!state.sources[1].Open(content2.filename, hw_ctx))
             throw std::runtime_error("Failed to open video 2");
 
         // 5. Allocate Decoding Buffers

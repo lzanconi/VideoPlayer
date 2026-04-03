@@ -10,7 +10,7 @@ struct AppState
     GLRenderer* renderer = nullptr;
 };
 
-struct VideoResource
+struct VideoContent
 {
     std::string filename;
 };
