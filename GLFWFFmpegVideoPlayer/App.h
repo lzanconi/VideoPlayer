@@ -29,7 +29,8 @@ public:
         for (const auto& videoContent : videoContents)
         {
             VideoSource* videoSource = new VideoSource();
-            if (videoSource->Open(videoContent.filename, hw_ctx)) { //
+            if (videoSource->Open(videoContent.filename, hw_ctx)) {
+                videoSource->SetFadeDuration(videoContent.fadeDuration);
                 state.sources.push_back(videoSource);
             }
             else {
@@ -56,8 +57,6 @@ public:
 
     void Run()
     {
-        const float fadeDuration = 2.5f;
-
         while (!renderer->ShouldClose()) { //
             renderer->PollEvents();
 
@@ -72,8 +71,9 @@ public:
             }
 
             // Calculate cross-fade alpha progress
-            double elapsed = glfwGetTime() - current.GetAdjustedStartTime(); //
-            float alpha = (fadeDuration > 0) ? (float)(elapsed / fadeDuration) : 1.0f;
+            double elapsed = glfwGetTime() - current.GetAdjustedStartTime();
+            float currentFadeLimit = current.GetFadeDuration();
+            float alpha = (currentFadeLimit > 0) ? (float)(elapsed / currentFadeLimit) : 1.0f;
 
             if (alpha >= 1.0f) {
                 alpha = 1.0f;
@@ -94,6 +94,13 @@ public:
 
             renderer->SwapBuffers(); //
         }
+    }
+
+    VideoSource* GetSource(int index) {
+        if (index >= 0 && index < state.sources.size()) {
+            return state.sources[index];
+        }
+        return nullptr;
     }
 
 private:

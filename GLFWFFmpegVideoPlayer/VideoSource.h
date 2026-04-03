@@ -24,6 +24,7 @@ private:
 	std::string filename;
 	bool isInitialized = false;
 	bool isPaused = false;
+	float fadeDuration = 0.0f;
 
 public:
 	VideoSource() = default;
@@ -133,4 +134,6 @@ public:
 	double GetAdjustedStartTime() const {
 		return startTime + totalPausedTime;
 	}
+	float GetFadeDuration() const { return fadeDuration; }
+	void SetFadeDuration(float duration) { fadeDuration = duration; }
 };
