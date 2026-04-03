@@ -45,6 +45,9 @@ public:
         frm = av_frame_alloc();
         sw_frm = av_frame_alloc();
 
+        // Initialize FPS timer
+        state.lastFPSUpdate = glfwGetTime();
+
     }
 
     ~App()
@@ -122,6 +125,17 @@ public:
 
             renderer->SwapBuffers();
 
+            // --- FPS CALCULATION ---
+            state.frameCount++;
+            double currentTime = glfwGetTime();
+
+            // Update the console every 1.0 seconds
+            if (currentTime - state.lastFPSUpdate >= 1.0) {
+                std::cout << "FPS: " << state.frameCount << std::endl;
+
+                state.frameCount = 0;
+                state.lastFPSUpdate = currentTime;
+            }
         }
     }
 

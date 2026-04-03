@@ -11,6 +11,10 @@ struct AppState
     std::vector<VideoSource*> sources;
     GLRenderer* renderer = nullptr;
     double lastBackgroundPTS = -1.0;
+
+    // FPS Tracking
+    double lastFPSUpdate = 0;
+    int frameCount = 0;
 };
 
 struct VideoContent
