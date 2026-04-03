@@ -15,10 +15,10 @@ int main()
 	try
 	{
 		std::vector<VideoContent> playlist = {
-			{"test.mp4", 0.0f},
-			{"Part1.mp4", 5.0f},
-			{"cover1.mp4", 0},
-			{"3.mp4", 10.0f}
+			{"test.mp4", 2.0f},
+			{"Part1.mp4", 2.0f},
+			{"cover1.mp4", 2.0},
+			{"3.mp4", 1.0f}
 		};
 
 		App app(1280, 720, "Video Player", playlist);

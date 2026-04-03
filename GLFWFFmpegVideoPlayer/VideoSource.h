@@ -19,12 +19,14 @@ private:
 	double startTime = 0;
 	// Time when the pause started
 	double pauseTime = 0;
-	//Cumulative time spent paused
+	// Cumulative time spent paused
 	double totalPausedTime = 0;
 	std::string filename;
 	bool isInitialized = false;
 	bool isPaused = false;
-	float fadeDuration = 0.0f;
+
+	// New property to manage individual fade-in duration
+	float fadeDuration = 2.5f;
 
 public:
 	VideoSource() = default;
@@ -89,8 +91,8 @@ public:
 		}
 	}
 
-	// Seek to beginning and reset timing
-	void Restart(double currentGLFWTime)
+	// Updated to distinguish between a manual switch (trigger fade) and a loop (no fade)
+	void Restart(double currentGLFWTime, bool resetTimer = true)
 	{
 		if (!isInitialized)
 			return;
@@ -101,28 +103,31 @@ public:
 		// CRITICAL: Tell the hardware decoder to forget any frames it's currently processing
 		avcodec_flush_buffers(codecCtx);
 
-		// Reset our synchronization anchor
-		startTime = currentGLFWTime;
-		//Reset pause anchor
+		// Only reset timing anchors if we want a fresh fade-in (e.g., on manual switch)
+		if (resetTimer)
+		{
+			startTime = currentGLFWTime;
+			totalPausedTime = 0;
+		}
+
+		// Reset pause anchor regardless of fade logic
 		pauseTime = 0;
-		//Reset cumulative pause
-		totalPausedTime = 0;
-		//Ensure it starts playing
+		// Ensure it starts playing
 		isPaused = false;
 	}
 
-	void Close() 
+	void Close()
 	{
-		if (codecCtx) 
+		if (codecCtx)
 			avcodec_free_context(&codecCtx);
 
-		if (formatCtx) 
+		if (formatCtx)
 			avformat_close_input(&formatCtx);
 
 		isInitialized = false;
 	}
 
-	// Getters
+	// Getters and Setters
 	AVFormatContext* GetFmtCtx() { return formatCtx; }
 	AVCodecContext* GetCodecCtx() { return codecCtx; }
 	int GetStreamIdx() const { return streamID; }
@@ -134,6 +139,8 @@ public:
 	double GetAdjustedStartTime() const {
 		return startTime + totalPausedTime;
 	}
+
+	// New fade property accessors
 	float GetFadeDuration() const { return fadeDuration; }
 	void SetFadeDuration(float duration) { fadeDuration = duration; }
 };

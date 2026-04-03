@@ -30,6 +30,7 @@ public:
         {
             VideoSource* videoSource = new VideoSource();
             if (videoSource->Open(videoContent.filename, hw_ctx)) {
+                // Apply the fade duration from the playlist definition
                 videoSource->SetFadeDuration(videoContent.fadeDuration);
                 state.sources.push_back(videoSource);
             }
@@ -55,13 +56,21 @@ public:
         if (hw_ctx) av_buffer_unref(&hw_ctx);
     }
 
+    // New method to access specific video sources
+    VideoSource* GetSource(int index) {
+        if (index >= 0 && index < (int)state.sources.size()) {
+            return state.sources[index];
+        }
+        return nullptr;
+    }
+
     void Run()
     {
-        while (!renderer->ShouldClose()) { //
+        while (!renderer->ShouldClose()) {
             renderer->PollEvents();
 
             VideoSource& current = *state.sources[state.activeIndex];
-            if (current.IsPaused()) { //
+            if (current.IsPaused()) {
                 Sleep(10);
                 continue;
             }
@@ -70,7 +79,7 @@ public:
                 current.SetStartTime(glfwGetTime());
             }
 
-            // Calculate cross-fade alpha progress
+            // Calculate cross-fade alpha progress using the source's own duration
             double elapsed = glfwGetTime() - current.GetAdjustedStartTime();
             float currentFadeLimit = current.GetFadeDuration();
             float alpha = (currentFadeLimit > 0) ? (float)(elapsed / currentFadeLimit) : 1.0f;
@@ -81,30 +90,23 @@ public:
             }
 
             // --- RENDER PASS ---
-            glClear(GL_COLOR_BUFFER_BIT); //
+            glClear(GL_COLOR_BUFFER_BIT);
 
             // 1. Render Background (Slot 1) if a transition is active
             if (state.previousIndex != -1 && state.previousIndex != state.activeIndex) {
                 VideoSource& prev = *state.sources[state.previousIndex];
-                UpdateAndDraw(prev, 1.0f, 1); // Use texture slot 1
+                UpdateAndDraw(prev, 1.0f, 1); // Background is always fully opaque
             }
 
             // 2. Render Foreground (Slot 0)
-            UpdateAndDraw(current, alpha, 0); // Use texture slot 0
+            UpdateAndDraw(current, alpha, 0);
 
-            renderer->SwapBuffers(); //
+            renderer->SwapBuffers();
         }
-    }
-
-    VideoSource* GetSource(int index) {
-        if (index >= 0 && index < state.sources.size()) {
-            return state.sources[index];
-        }
-        return nullptr;
     }
 
 private:
-    static AppState state; //
+    static AppState state;
     GLRenderer* renderer;
     ShaderProgram* videoShader;
     AVBufferRef* hw_ctx = nullptr;
@@ -115,37 +117,40 @@ private:
     // Helper to decode a frame and render it to a specific texture slot
     void UpdateAndDraw(VideoSource& source, float alphaValue, int slot) {
         bool frameReady = false;
+
         while (!frameReady) {
-            if (av_read_frame(source.GetFmtCtx(), pkt) >= 0) { //
-                if (pkt->stream_index == source.GetStreamIdx()) {
-                    avcodec_send_packet(source.GetCodecCtx(), pkt);
+            int ret = av_read_frame(source.GetFmtCtx(), pkt); //
 
-                    if (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) {
-                        // Transfer GPU data to system RAM
-                        av_hwframe_transfer_data(sw_frm, frm, 0);
-
-                        // Update the textures in the assigned slot
-                        renderer->UpdateVideoTextures(slot,
-                            sw_frm->width, sw_frm->height,
+            if (ret >= 0) {
+                if (pkt->stream_index == source.GetStreamIdx()) { //
+                    avcodec_send_packet(source.GetCodecCtx(), pkt); //
+                    if (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) { //
+                        // Standard upload and render logic
+                        av_hwframe_transfer_data(sw_frm, frm, 0); //
+                        renderer->UpdateVideoTextures(slot, sw_frm->width, sw_frm->height,
                             sw_frm->linesize[0], sw_frm->data[0],
-                            sw_frm->linesize[1], sw_frm->data[1]
-                        );
+                            sw_frm->linesize[1], sw_frm->data[1]); //
 
-                        // Set alpha and render the geometry for this slot
                         videoShader->Use(); //
-                        glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), alphaValue);
+                        glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), alphaValue); //
                         renderer->Render(videoShader->programID, slot); //
 
-                        av_frame_unref(sw_frm);
-                        av_frame_unref(frm);
+                        av_frame_unref(sw_frm); //
+                        av_frame_unref(frm); //
                         frameReady = true;
                     }
                 }
-                av_packet_unref(pkt);
+                av_packet_unref(pkt); //
             }
             else {
-                source.Restart(glfwGetTime()); //
-                frameReady = true;
+                // End of file reached: Drain decoder then Restart
+                avcodec_send_packet(source.GetCodecCtx(), NULL); // Enter draining mode
+                while (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) {
+                    // Optional: Render these last few frames to avoid a jump
+                    av_frame_unref(frm);
+                }
+                // Restart without resetting the fade timer
+                source.Restart(glfwGetTime(), false);
             }
         }
     }
@@ -162,12 +167,12 @@ private:
             state.previousIndex = state.activeIndex;
             state.activeIndex = nextIdx;
 
-            // Restart the new source to reset its timer for alpha calculation
-            state.sources[state.activeIndex]->Restart(glfwGetTime());
+            // Manual switch: Reset the timer to trigger a fresh fade-in
+            state.sources[state.activeIndex]->Restart(glfwGetTime(), true);
         }
 
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
-        if (key == GLFW_KEY_SPACE) state.sources[state.activeIndex]->TogglePause(glfwGetTime()); //
-        if (key == GLFW_KEY_F && state.renderer) state.renderer->ToggleFullscreen(); //
+        if (key == GLFW_KEY_SPACE) state.sources[state.activeIndex]->TogglePause(glfwGetTime());
+        if (key == GLFW_KEY_F && state.renderer) state.renderer->ToggleFullscreen();
     }
 };
