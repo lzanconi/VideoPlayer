@@ -8,22 +8,20 @@
 #include "ShaderProgram.h"
 #include "VideoSource.h"
 
-
 class App
 {
 public:
-	App(int width, int height, const std::string& title, const std::vector<VideoContent>& videoContents)
-	{
-        // 1. Initialize Global State and Callbacks
+    App(int width, int height, const std::string& title, const std::vector<VideoContent>& videoContents)
+    {
+        // 1. Initialize Renderer and set the global reference
         renderer = new GLRenderer(width, height, title.c_str());
         renderer->SetKeyCallback(App::KeyCallback);
         state.renderer = renderer;
 
-        // 2. Load Shaders and Setup Texture Units
+        // 2. Load Shaders
         videoShader = new ShaderProgram("shader.vert", "shader.frag");
-        videoShader->SetTextureUnits();
 
-        // 3. Setup Hardware Acceleration (D3D11VA)
+        // 3. Setup Hardware Acceleration
         if (av_hwdevice_ctx_create(&hw_ctx, AV_HWDEVICE_TYPE_D3D11VA, NULL, NULL, 0) < 0) {
             throw std::runtime_error("Failed to create HW Device Context");
         }
@@ -31,157 +29,138 @@ public:
         for (const auto& videoContent : videoContents)
         {
             VideoSource* videoSource = new VideoSource();
-            if (videoSource->Open(videoContent.filename, hw_ctx))
-            {
+            if (videoSource->Open(videoContent.filename, hw_ctx)) { //
                 state.sources.push_back(videoSource);
             }
-            else
-            {
+            else {
                 delete videoSource;
-                std::cerr << "Warning: Could not open " << videoContent.filename << std::endl;
             }
         }
 
-        if (state.sources.empty()) 
-            throw std::runtime_error("No videos could be loaded");
-
-        // 5. Allocate Decoding Buffers
+        // 4. Allocate shared decoding buffers
         pkt = av_packet_alloc();
         frm = av_frame_alloc();
         sw_frm = av_frame_alloc();
-	}
+    }
 
     ~App()
     {
-        if (renderer)
-            delete renderer;
-
-        if (videoShader)
-            delete videoShader;
-
-        for (auto source : state.sources)
-        {
-            delete source;
-        }
-        state.sources.clear();
-
+        if (renderer) delete renderer;
+        if (videoShader) delete videoShader;
+        for (auto source : state.sources) delete source;
         av_frame_free(&frm);
         av_frame_free(&sw_frm);
         av_packet_free(&pkt);
-
-        if (hw_ctx) 
-            av_buffer_unref(&hw_ctx);
+        if (hw_ctx) av_buffer_unref(&hw_ctx);
     }
 
     void Run()
     {
-        const float fadeDuration = 0.0f;
+        const float fadeDuration = 2.5f;
 
-        // 6. Main Execution Loop
-        while (!renderer->ShouldClose()) {
-            
+        while (!renderer->ShouldClose()) { //
+            renderer->PollEvents();
+
             VideoSource& current = *state.sources[state.activeIndex];
-
-            if (current.IsPaused())
-            {
-                renderer->PollEvents();
+            if (current.IsPaused()) { //
                 Sleep(10);
                 continue;
             }
 
-            state.interruptRead = false;
-            // Sync check
             if (current.GetStartTime() <= 0) {
                 current.SetStartTime(glfwGetTime());
             }
 
-            double timeSinceStart = glfwGetTime() - current.GetAdjustedStartTime();
-            float alpha = (fadeDuration > 0) ? (float)(timeSinceStart / fadeDuration) : 1.0f;
-            if (alpha > 1.0f) alpha = 1.0f;
-            if (alpha < 0.0f) alpha = 0.0f;
+            // Calculate cross-fade alpha progress
+            double elapsed = glfwGetTime() - current.GetAdjustedStartTime(); //
+            float alpha = (fadeDuration > 0) ? (float)(elapsed / fadeDuration) : 1.0f;
 
-            videoShader->Use();
-            videoShader->SetUniformFloat("uAlpha", alpha);
+            if (alpha >= 1.0f) {
+                alpha = 1.0f;
+                state.previousIndex = -1; // End the transition period
+            }
 
-            if (av_read_frame(current.GetFmtCtx(), pkt) >= 0) {
-                if (pkt->stream_index == current.GetStreamIdx()) {
-                    avcodec_send_packet(current.GetCodecCtx(), pkt);
+            // --- RENDER PASS ---
+            glClear(GL_COLOR_BUFFER_BIT); //
 
-                    while (avcodec_receive_frame(current.GetCodecCtx(), frm) >= 0) {
-                        if (state.interruptRead) {
-                            av_frame_unref(frm);
-                            break;
-                        }
+            // 1. Render Background (Slot 1) if a transition is active
+            if (state.previousIndex != -1 && state.previousIndex != state.activeIndex) {
+                VideoSource& prev = *state.sources[state.previousIndex];
+                UpdateAndDraw(prev, 1.0f, 1); // Use texture slot 1
+            }
 
-                        // Synchronization logic
-                        double pts = frm->pts * av_q2d(current.GetFmtCtx()->streams[current.GetStreamIdx()]->time_base);
-                        double elapsed = glfwGetTime() - current.GetAdjustedStartTime();
-                        if (pts > elapsed) {
-                            if (pts - elapsed > 0.002) Sleep((DWORD)((pts - elapsed) * 1000));
-                        }
+            // 2. Render Foreground (Slot 0)
+            UpdateAndDraw(current, alpha, 0); // Use texture slot 0
 
-                        if (!state.interruptRead) {
-                            // Transfer GPU data to System RAM and Render
-                            av_hwframe_transfer_data(sw_frm, frm, 0);
-                            renderer->UpdateVideoTextures(
-                                sw_frm->width, sw_frm->height,
-                                sw_frm->linesize[0], sw_frm->data[0],
-                                sw_frm->linesize[1], sw_frm->data[1]
-                            );
+            renderer->SwapBuffers(); //
+        }
+    }
 
-                            renderer->Render(videoShader->programID);
-                            renderer->SwapBuffers();
-                        }
+private:
+    static AppState state; //
+    GLRenderer* renderer;
+    ShaderProgram* videoShader;
+    AVBufferRef* hw_ctx = nullptr;
+    AVPacket* pkt = nullptr;
+    AVFrame* frm = nullptr;
+    AVFrame* sw_frm = nullptr;
+
+    // Helper to decode a frame and render it to a specific texture slot
+    void UpdateAndDraw(VideoSource& source, float alphaValue, int slot) {
+        bool frameReady = false;
+        while (!frameReady) {
+            if (av_read_frame(source.GetFmtCtx(), pkt) >= 0) { //
+                if (pkt->stream_index == source.GetStreamIdx()) {
+                    avcodec_send_packet(source.GetCodecCtx(), pkt);
+
+                    if (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) {
+                        // Transfer GPU data to system RAM
+                        av_hwframe_transfer_data(sw_frm, frm, 0);
+
+                        // Update the textures in the assigned slot
+                        renderer->UpdateVideoTextures(slot,
+                            sw_frm->width, sw_frm->height,
+                            sw_frm->linesize[0], sw_frm->data[0],
+                            sw_frm->linesize[1], sw_frm->data[1]
+                        );
+
+                        // Set alpha and render the geometry for this slot
+                        videoShader->Use(); //
+                        glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), alphaValue);
+                        renderer->Render(videoShader->programID, slot); //
 
                         av_frame_unref(sw_frm);
                         av_frame_unref(frm);
-                        renderer->PollEvents();
+                        frameReady = true;
                     }
                 }
                 av_packet_unref(pkt);
             }
             else {
-                current.Restart(glfwGetTime());
+                source.Restart(glfwGetTime()); //
+                frameReady = true;
             }
-            renderer->PollEvents();
         }
     }
 
-private:
-	static AppState state;
-	GLRenderer* renderer;
-	ShaderProgram* videoShader;
-	AVBufferRef* hw_ctx = nullptr;
-	AVPacket* pkt = nullptr;
-	AVFrame* frm = nullptr;
-	AVFrame* sw_frm = nullptr;
-
-    // Static callback required for GLFW compatibility
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
         if (action != GLFW_PRESS) return;
 
-        if (key == GLFW_KEY_F && state.renderer) {
-            state.renderer->ToggleFullscreen();
-        }
-
-        if (key == GLFW_KEY_ESCAPE)
-            glfwSetWindowShouldClose(window, true);
-
-        if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_LEFT) 
-        {
+        if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_LEFT) {
             int dir = (key == GLFW_KEY_RIGHT) ? 1 : -1;
             int nextIdx = (state.activeIndex + dir) % (int)state.sources.size();
             if (nextIdx < 0) nextIdx = (int)state.sources.size() - 1;
 
+            // Trigger cross-fade transition logic
+            state.previousIndex = state.activeIndex;
             state.activeIndex = nextIdx;
-            state.interruptRead = true;
+
+            // Restart the new source to reset its timer for alpha calculation
             state.sources[state.activeIndex]->Restart(glfwGetTime());
-            std::cout << "Switched to: " << state.sources[state.activeIndex]->GetFilename() << std::endl;
         }
 
-        if (key == GLFW_KEY_SPACE) {
-            state.sources[state.activeIndex]->TogglePause(glfwGetTime());
-        }
+        if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
+        if (key == GLFW_KEY_SPACE) state.sources[state.activeIndex]->TogglePause(glfwGetTime()); //
+        if (key == GLFW_KEY_F && state.renderer) state.renderer->ToggleFullscreen(); //
     }
-
 };

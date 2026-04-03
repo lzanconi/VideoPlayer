@@ -15,16 +15,17 @@ public:
 			exit(-1);
 
 		window = glfwCreateWindow(width, height, title, NULL, NULL);
-		if (!window) 
-		{ 
-			glfwTerminate(); 
-			exit(-1); 
+		if (!window)
+		{
+			glfwTerminate();
+			exit(-1);
 		}
 
 		glfwMakeContextCurrent(window);
 		gladLoaderLoadGL();
 		glfwSwapInterval(1);
 
+		// Enable blending for the cross-fade effect
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -39,21 +40,29 @@ public:
 		glDeleteBuffers(1, &EBO);
 		glDeleteTextures(1, &yTex);
 		glDeleteTextures(1, &uvTex);
+		glDeleteTextures(1, &yTex2);
+		glDeleteTextures(1, &uvTex2);
 		glfwDestroyWindow(window);
 		glfwTerminate();
 	}
 
-	void UpdateVideoTextures(int w, int h, int lsY, uint8_t* dY, int lsUV, uint8_t* dUV)
+	// Updated to accept a 'slot' (0 for foreground, 1 for background)
+	void UpdateVideoTextures(int slot, int w, int h, int lsY, uint8_t* dY, int lsUV, uint8_t* dUV)
 	{
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, yTex);
+		// Select which texture set to update based on the slot
+		GLuint currentY = (slot == 0) ? yTex : yTex2;
+		GLuint currentUV = (slot == 0) ? uvTex : uvTex2;
+
+		// Use texture units 0 & 1 for slot 0, and 2 & 3 for slot 1
+		glActiveTexture(GL_TEXTURE0 + (slot * 2));
+		glBindTexture(GL_TEXTURE_2D, currentY);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, lsY);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, dY);
 
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, uvTex);
+		glActiveTexture(GL_TEXTURE1 + (slot * 2));
+		glBindTexture(GL_TEXTURE_2D, currentUV);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, lsUV / 2);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, w / 2, h / 2, 0, GL_RG, GL_UNSIGNED_BYTE, dUV);
 
@@ -66,30 +75,30 @@ public:
 		const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 
 		if (!isFullscreen) {
-			// Save current windowed position and size
 			glfwGetWindowPos(window, &winX, &winY);
 			glfwGetWindowSize(window, &winW, &winH);
-			// Switch to Fullscreen
 			glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
 		}
 		else {
-			// Switch back to Windowed using saved values
 			glfwSetWindowMonitor(window, NULL, winX, winY, winW, winH, 0);
 		}
 		isFullscreen = !isFullscreen;
-		glfwSwapInterval(1); // Reset V-Sync after mode switch
+		glfwSwapInterval(1);
 	}
 
-	void Render(unsigned int shaderProgramID)
+	// Updated Render to bind the correct texture units for the specific slot
+	void Render(unsigned int shaderProgramID, int slot)
 	{
-		// Handling aspect ratio/viewport
 		int dw, dh;
 		glfwGetFramebufferSize(window, &dw, &dh);
-		// Note: In a real app, you'd pass the video aspect ratio here to calculate the viewport
 		glViewport(0, 0, dw, dh);
 
-		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(shaderProgramID);
+
+		// Manually update the sampler uniforms to point to the correct texture units
+		glUniform1i(glGetUniformLocation(shaderProgramID, "yTexture"), slot * 2);
+		glUniform1i(glGetUniformLocation(shaderProgramID, "uvTexture"), (slot * 2) + 1);
+
 		glBindVertexArray(VAO);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	}
@@ -102,7 +111,8 @@ public:
 private:
 	GLFWwindow* window;
 	unsigned int VAO, VBO, EBO;
-	unsigned int yTex, uvTex;
+	unsigned int yTex, uvTex;   // Slot 0 (Foreground)
+	unsigned int yTex2, uvTex2; // Slot 1 (Background)
 	bool isFullscreen = false;
 	int winX = 100, winY = 100, winW = 1280, winH = 720;
 
@@ -137,6 +147,9 @@ private:
 	{
 		glGenTextures(1, &yTex);
 		glGenTextures(1, &uvTex);
+		glGenTextures(1, &yTex2);
+		glGenTextures(1, &uvTex2);
+
 		auto initTex = [](GLuint t) {
 			glBindTexture(GL_TEXTURE_2D, t);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -144,6 +157,8 @@ private:
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			};
+
 		initTex(yTex); initTex(uvTex);
+		initTex(yTex2); initTex(uvTex2);
 	}
 };

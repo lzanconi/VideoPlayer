@@ -2,9 +2,10 @@
 #include "VideoSource.h"
 #include "GLRenderer.h"
 
-struct AppState 
+struct AppState
 {
     int activeIndex = 0;
+    int previousIndex = -1;
     bool interruptRead = false;
     std::vector<VideoSource*> sources;
     GLRenderer* renderer = nullptr;
