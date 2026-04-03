@@ -14,5 +14,6 @@ struct AppState
 struct VideoContent
 {
     std::string filename;
-    float fadeDuration = 2.5f;
+    float fadeInDuration = 2.5f;
+    float fadeOutDuration = 1.0f;
 };

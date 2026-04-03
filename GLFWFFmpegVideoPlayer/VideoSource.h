@@ -25,8 +25,9 @@ private:
 	bool isInitialized = false;
 	bool isPaused = false;
 
-	// New property to manage individual fade-in duration
-	float fadeDuration = 2.5f;
+	// Separate properties for fade-in and fade-out
+	float fadeInDuration = 2.5f;
+	float fadeOutDuration = 2.5f;
 
 public:
 	VideoSource() = default;
@@ -60,8 +61,10 @@ public:
 
 		// 5. Link Hardware Context
 		codecCtx->hw_device_ctx = av_buffer_ref(hwDeviceCtx);
+		codecCtx->hw_device_ctx = av_buffer_ref(hwDeviceCtx);
 		codecCtx->get_format = [](AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) {
 			for (const enum AVPixelFormat* p = pix_fmts; *p != -1; p++) {
+				// Corrected from AV_PI_FMT_D3D11 to AV_PIX_FMT_D3D11
 				if (*p == AV_PIX_FMT_D3D11) return *p;
 			}
 			return AV_PIX_FMT_NONE;
@@ -91,28 +94,21 @@ public:
 		}
 	}
 
-	// Updated to distinguish between a manual switch (trigger fade) and a loop (no fade)
 	void Restart(double currentGLFWTime, bool resetTimer = true)
 	{
 		if (!isInitialized)
 			return;
 
-		// Seek to the very beginning of the video stream
 		av_seek_frame(formatCtx, streamID, 0, AVSEEK_FLAG_BACKWARD);
-
-		// CRITICAL: Tell the hardware decoder to forget any frames it's currently processing
 		avcodec_flush_buffers(codecCtx);
 
-		// Only reset timing anchors if we want a fresh fade-in (e.g., on manual switch)
 		if (resetTimer)
 		{
 			startTime = currentGLFWTime;
 			totalPausedTime = 0;
 		}
 
-		// Reset pause anchor regardless of fade logic
 		pauseTime = 0;
-		// Ensure it starts playing
 		isPaused = false;
 	}
 
@@ -125,6 +121,13 @@ public:
 			avformat_close_input(&formatCtx);
 
 		isInitialized = false;
+	}
+
+	// Helper to calculate total duration in seconds for fade-out timing
+	double GetDurationInSeconds() const {
+		if (!formatCtx || streamID < 0) return 0;
+		// Duration is stored in time_base units
+		return (double)formatCtx->streams[streamID]->duration * av_q2d(formatCtx->streams[streamID]->time_base);
 	}
 
 	// Getters and Setters
@@ -140,7 +143,8 @@ public:
 		return startTime + totalPausedTime;
 	}
 
-	// New fade property accessors
-	float GetFadeDuration() const { return fadeDuration; }
-	void SetFadeDuration(float duration) { fadeDuration = duration; }
+	float GetFadeInDuration() const { return fadeInDuration; }
+	void SetFadeInDuration(float duration) { fadeInDuration = duration; }
+	float GetFadeOutDuration() const { return fadeOutDuration; }
+	void SetFadeOutDuration(float duration) { fadeOutDuration = duration; }
 };
