@@ -12,7 +12,7 @@
 class App
 {
 public:
-	App(int width, int height, const std::string& title)
+	App(int width, int height, const std::string& title, const std::vector<VideoContent>& videoContents)
 	{
         // 1. Initialize Global State and Callbacks
         renderer = new GLRenderer(width, height, title.c_str());
@@ -28,15 +28,22 @@ public:
             throw std::runtime_error("Failed to create HW Device Context");
         }
 
-        VideoContent content1;
-        content1.filename = "test.mp4";
-        VideoContent content2;
-        content2.filename = "Part1.mp4";
-        // 4. Open Video Sources
-        if (!state.sources[0].Open(content1.filename, hw_ctx))
-            throw std::runtime_error("Failed to open video 1");
-        if (!state.sources[1].Open(content2.filename, hw_ctx))
-            throw std::runtime_error("Failed to open video 2");
+        for (const auto& videoContent : videoContents)
+        {
+            VideoSource* videoSource = new VideoSource();
+            if (videoSource->Open(videoContent.filename, hw_ctx))
+            {
+                state.sources.push_back(videoSource);
+            }
+            else
+            {
+                delete videoSource;
+                std::cerr << "Warning: Could not open " << videoContent.filename << std::endl;
+            }
+        }
+
+        if (state.sources.empty()) 
+            throw std::runtime_error("No videos could be loaded");
 
         // 5. Allocate Decoding Buffers
         pkt = av_packet_alloc();
@@ -52,6 +59,12 @@ public:
         if (videoShader)
             delete videoShader;
 
+        for (auto source : state.sources)
+        {
+            delete source;
+        }
+        state.sources.clear();
+
         av_frame_free(&frm);
         av_frame_free(&sw_frm);
         av_packet_free(&pkt);
@@ -65,7 +78,7 @@ public:
         // 6. Main Execution Loop
         while (!renderer->ShouldClose()) {
             state.interruptRead = false;
-            VideoSource& current = state.sources[state.activeIndex];
+            VideoSource& current = *state.sources[state.activeIndex];
 
             // Sync check
             if (current.GetStartTime() <= 0) {
@@ -136,12 +149,16 @@ private:
         if (key == GLFW_KEY_ESCAPE)
             glfwSetWindowShouldClose(window, true);
 
-        if (key == GLFW_KEY_1 || key == GLFW_KEY_2) {
-            int newIdx = (key == GLFW_KEY_1) ? 0 : 1;
-            state.activeIndex = newIdx;
+        if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_LEFT) 
+        {
+            int dir = (key == GLFW_KEY_RIGHT) ? 1 : -1;
+            int nextIdx = (state.activeIndex + dir) % (int)state.sources.size();
+            if (nextIdx < 0) nextIdx = (int)state.sources.size() - 1;
+
+            state.activeIndex = nextIdx;
             state.interruptRead = true;
-            state.sources[state.activeIndex].Restart(glfwGetTime());
-            std::cout << "Switched to Video " << (state.activeIndex + 1) << std::endl;
+            state.sources[state.activeIndex]->Restart(glfwGetTime());
+            std::cout << "Switched to: " << state.sources[state.activeIndex]->GetFilename() << std::endl;
         }
     }
 

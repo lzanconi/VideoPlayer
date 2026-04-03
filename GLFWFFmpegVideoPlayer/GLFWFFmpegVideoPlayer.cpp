@@ -14,7 +14,14 @@ int main()
 {
 	try
 	{
-		App app(1280, 720, "Video Player");
+		std::vector<VideoContent> playlist = {
+			{"test.mp4"},
+			{"Part1.mp4"},
+			{"cover1.mp4"},
+			{"3.mp4"}
+		};
+
+		App app(1280, 720, "Video Player", playlist);
 		app.Run();
 	}
 	catch (const std::exception& e) {

@@ -6,7 +6,7 @@ struct AppState
 {
     int activeIndex = 0;
     bool interruptRead = false;
-    VideoSource sources[2];
+    std::vector<VideoSource*> sources;
     GLRenderer* renderer = nullptr;
 };
 
