@@ -80,6 +80,10 @@ public:
         glUniform1i(glGetUniformLocation(programID, uniformName.c_str()), value);
     }
 
+    void SetUniformFloat(const std::string& uniformName, float value) {
+        glUniform1f(glGetUniformLocation(programID, uniformName.c_str()), value);
+    }
+
     void SetTextureUnits()
     {
         Use();

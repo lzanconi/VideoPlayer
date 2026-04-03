@@ -75,6 +75,8 @@ public:
 
     void Run()
     {
+        const float fadeDuration = 0.0f;
+
         // 6. Main Execution Loop
         while (!renderer->ShouldClose()) {
             
@@ -92,6 +94,14 @@ public:
             if (current.GetStartTime() <= 0) {
                 current.SetStartTime(glfwGetTime());
             }
+
+            double timeSinceStart = glfwGetTime() - current.GetAdjustedStartTime();
+            float alpha = (fadeDuration > 0) ? (float)(timeSinceStart / fadeDuration) : 1.0f;
+            if (alpha > 1.0f) alpha = 1.0f;
+            if (alpha < 0.0f) alpha = 0.0f;
+
+            videoShader->Use();
+            videoShader->SetUniformFloat("uAlpha", alpha);
 
             if (av_read_frame(current.GetFmtCtx(), pkt) >= 0) {
                 if (pkt->stream_index == current.GetStreamIdx()) {
