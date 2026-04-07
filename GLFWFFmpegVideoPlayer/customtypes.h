@@ -22,4 +22,5 @@ struct VideoContent
     std::string filename;
     float fadeInDuration = 2.5f;
     float fadeOutDuration = 1.0f;
+    bool looped = false;
 };

@@ -29,6 +29,7 @@ private:
     std::string filename;
     bool isInitialized = false;
     bool isPaused = false;
+    bool looped = false;
 
     float fadeInDuration = 2.5f;
     float fadeOutDuration = 1.0f;
@@ -132,8 +133,10 @@ public:
                     av_packet_unref(pkt);
                 }
                 else {
-                    if (slot == 0) {
+                    if (looped) {
                         Rewind();
+                        startTime = glfwGetTime(); // Reset start time for the new loop
+                        totalPausedTime = 0;
                         frameReady = true;
                     }
                     else {
@@ -199,6 +202,8 @@ public:
 
         return (double)formatCtx->streams[streamID]->duration * av_q2d(formatCtx->streams[streamID]->time_base);
     }
+
+    void SetLooped(bool l) { looped = l; }
 
     double GetAdjustedStartTime() const { return startTime + totalPausedTime; }
     bool IsPaused() const { return isPaused; }

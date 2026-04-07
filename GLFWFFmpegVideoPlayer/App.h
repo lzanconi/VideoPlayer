@@ -34,6 +34,7 @@ public:
             if (videoSource->Open(videoContent.filename, hw_ctx)) {
                 videoSource->SetFadeInDuration(videoContent.fadeInDuration);
                 videoSource->SetFadeOutDuration(videoContent.fadeOutDuration);
+                videoSource->SetLooped(videoContent.looped);
                 state.sources.push_back(videoSource);
             }
             else {
