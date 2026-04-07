@@ -2,6 +2,8 @@
 #include <string>
 #include <iostream>
 #include <windows.h>
+#include <glad/gl.h>
+#include <GLFW/glfw3.h>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -10,6 +12,9 @@ extern "C" {
 #include <libavutil/imgutils.h>
 }
 
+#include "GLRenderer.h"
+#include "ShaderProgram.h"
+
 class VideoSource
 {
 private:
@@ -17,17 +22,16 @@ private:
     AVCodecContext* codecCtx = nullptr;
     int streamID = -1;
     double startTime = 0;
-    // Time when the pause started
     double pauseTime = 0;
-    // Cumulative time spent paused
     double totalPausedTime = 0;
+    double lastPTS = -1.0;
+
     std::string filename;
     bool isInitialized = false;
     bool isPaused = false;
 
-    // Separate properties for fade-in and fade-out durations
     float fadeInDuration = 2.5f;
-    float fadeOutDuration = 2.5f;
+    float fadeOutDuration = 1.0f;
 
 public:
     VideoSource() = default;
@@ -40,30 +44,23 @@ public:
     bool Open(const std::string& file, AVBufferRef* hwDeviceCtx)
     {
         filename = file;
-
-        // 1. Open File
         if (avformat_open_input(&formatCtx, file.c_str(), NULL, NULL) < 0) {
             std::cerr << "Failed to open: " << file << std::endl;
             return false;
         }
 
-        // 2. Get Stream Info
         if (avformat_find_stream_info(formatCtx, NULL) < 0) return false;
 
-        // 3. Find Video Stream
         streamID = av_find_best_stream(formatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
         if (streamID < 0) return false;
 
-        // 4. Setup Decoder
         const AVCodec* decoder = avcodec_find_decoder(formatCtx->streams[streamID]->codecpar->codec_id);
         codecCtx = avcodec_alloc_context3(decoder);
         avcodec_parameters_to_context(codecCtx, formatCtx->streams[streamID]->codecpar);
 
-        // 5. Link Hardware Context
         codecCtx->hw_device_ctx = av_buffer_ref(hwDeviceCtx);
         codecCtx->get_format = [](AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) {
             for (const enum AVPixelFormat* p = pix_fmts; *p != -1; p++) {
-                // Corrected identifier to AV_PIX_FMT_D3D11
                 if (*p == AV_PIX_FMT_D3D11) return *p;
             }
             return AV_PIX_FMT_NONE;
@@ -71,90 +68,150 @@ public:
 
         if (avcodec_open2(codecCtx, decoder, NULL) < 0) return false;
 
-        startTime = 0; // Will be set on first frame read
         isInitialized = true;
         return true;
     }
 
+    /**
+     * Resets the FFmpeg stream position and clears internal decoder buffers.
+     * Use this to prepare the video to play from the start without affecting playback timers.
+     */
+    void Rewind()
+    {
+        if (!isInitialized) return;
+        av_seek_frame(formatCtx, streamID, 0, AVSEEK_FLAG_BACKWARD);
+        avcodec_flush_buffers(codecCtx);
+        lastPTS = -1.0;
+    }
+
+    /**
+     * Initializes the playback timing state.
+     * Use this to trigger a fresh start (e.g., triggering the Fade-In effect).
+     */
+    void StartPlayback(double currentGLFWTime)
+    {
+        startTime = currentGLFWTime;
+        totalPausedTime = 0;
+        pauseTime = 0;
+        isPaused = false;
+        lastPTS = -1.0;
+    }
+
+    /**
+     * Updates and renders the video frame.
+     * Returns true if playing, false if finished (foreground only).
+     */
+    bool UpdateAndRender(GLRenderer* renderer, ShaderProgram* shader, AVFrame* frm, AVFrame* sw_frm, AVPacket* pkt, int slot)
+    {
+        if (!isInitialized) return true;
+
+        double currentTime = glfwGetTime();
+
+        // Auto-initialize timing if it hasn't been set yet
+        if (startTime <= 0) StartPlayback(currentTime);
+
+        if (isPaused) {
+            shader->Use();
+            glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), CalculateAlpha(currentTime));
+            renderer->Render(shader->programID, slot);
+            return true;
+        }
+
+        double playPos = currentTime - GetAdjustedStartTime();
+        float alpha = CalculateAlpha(currentTime);
+
+        // 1. Decode Loop: Only decode a new frame if video time has advanced
+        if (playPos > lastPTS) {
+            bool frameReady = false;
+            while (!frameReady) {
+                if (av_read_frame(formatCtx, pkt) >= 0) {
+                    if (pkt->stream_index == streamID) {
+                        avcodec_send_packet(codecCtx, pkt);
+                        if (avcodec_receive_frame(codecCtx, frm) >= 0) {
+                            av_hwframe_transfer_data(sw_frm, frm, 0);
+
+                            renderer->UpdateVideoTextures(slot,
+                                sw_frm->width, sw_frm->height,
+                                sw_frm->linesize[0], sw_frm->data[0],
+                                sw_frm->linesize[1], sw_frm->data[1]
+                            );
+
+                            lastPTS = playPos;
+                            frameReady = true;
+                        }
+                    }
+                    av_packet_unref(pkt);
+                }
+                else {
+                    // End of Stream handling
+                    if (slot == 0) {
+                        // Background (Slot 0) loops forever by rewinding
+                        Rewind();
+                        frameReady = true;
+                    }
+                    else {
+                        // Foreground (Slot 1) signals it is finished
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // 2. Render Call: Maintains VSync even if no new frame was decoded
+        shader->Use();
+        glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), alpha);
+        renderer->Render(shader->programID, slot);
+
+        return true;
+    }
+
+    float CalculateAlpha(double currentTime)
+    {
+        double elapsed = currentTime - GetAdjustedStartTime();
+        double totalDuration = GetDurationInSeconds();
+        float alpha = 1.0f;
+
+        if (elapsed < fadeInDuration && fadeInDuration > 0) {
+            alpha = (float)(elapsed / fadeInDuration);
+        }
+        else if (elapsed > (totalDuration - fadeOutDuration) && fadeOutDuration > 0) {
+            double timeRemaining = totalDuration - elapsed;
+            alpha = (float)(timeRemaining / fadeOutDuration);
+        }
+
+        if (alpha < 0.0f) alpha = 0.0f;
+        if (alpha > 1.0f) alpha = 1.0f;
+        return alpha;
+    }
+
     void TogglePause(double currentGLFWTime)
     {
-        if (!isInitialized)
-            return;
-
-        if (!isPaused)
-        {
+        if (!isInitialized) return;
+        if (!isPaused) {
             pauseTime = currentGLFWTime;
             isPaused = true;
         }
-        else
-        {
+        else {
             totalPausedTime += (currentGLFWTime - pauseTime);
             isPaused = false;
         }
     }
 
-    // Updated to distinguish between a manual switch (trigger fade) and a loop (no fade)
-    void Restart(double currentGLFWTime, bool resetTimer = true)
-    {
-        if (!isInitialized)
-            return;
-
-        // Seek to the very beginning of the video stream
-        av_seek_frame(formatCtx, streamID, 0, AVSEEK_FLAG_BACKWARD);
-
-        // Flush the hardware decoder to clear currently processing frames
-        avcodec_flush_buffers(codecCtx);
-
-        // Only reset timing anchors if we want a fresh fade-in (e.g., on manual switch)
-        if (resetTimer)
-        {
-            startTime = currentGLFWTime;
-            totalPausedTime = 0;
-        }
-
-        // Reset pause anchor regardless of fade logic
-        pauseTime = 0;
-        isPaused = false;
-    }
-
     void Close()
     {
-        if (codecCtx)
-            avcodec_free_context(&codecCtx);
-
-        if (formatCtx)
-            avformat_close_input(&formatCtx);
-
+        if (codecCtx) avcodec_free_context(&codecCtx);
+        if (formatCtx) avformat_close_input(&formatCtx);
         isInitialized = false;
     }
 
-    // Helper to calculate total duration in seconds for fade-out timing
+    // Helpers
     double GetDurationInSeconds() const {
         if (!formatCtx || streamID < 0) return 0;
         return (double)formatCtx->streams[streamID]->duration * av_q2d(formatCtx->streams[streamID]->time_base);
     }
 
-    // Helper to calculate current play position relative to the application clock
-    double GetCurrentPlayPosition(double currentGLFWTime) const {
-        if (startTime <= 0) return 0;
-        return (currentGLFWTime - GetAdjustedStartTime());
-    }
-
-    // Getters and Setters
-    AVFormatContext* GetFmtCtx() { return formatCtx; }
-    AVCodecContext* GetCodecCtx() { return codecCtx; }
-    int GetStreamIdx() const { return streamID; }
-    double GetStartTime() const { return startTime; }
-    void SetStartTime(double t) { startTime = t; }
-    std::string GetFilename() const { return filename; }
-    bool Initialized() const { return isInitialized; }
+    double GetAdjustedStartTime() const { return startTime + totalPausedTime; }
     bool IsPaused() const { return isPaused; }
-    double GetAdjustedStartTime() const {
-        return startTime + totalPausedTime;
-    }
-
-    float GetFadeInDuration() const { return fadeInDuration; }
-    void SetFadeInDuration(float duration) { fadeInDuration = duration; }
-    float GetFadeOutDuration() const { return fadeOutDuration; }
-    void SetFadeOutDuration(float duration) { fadeOutDuration = duration; }
+    void SetFadeInDuration(float d) { fadeInDuration = d; }
+    void SetFadeOutDuration(float d) { fadeOutDuration = d; }
 };

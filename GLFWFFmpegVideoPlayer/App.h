@@ -2,6 +2,7 @@
 #include <iostream>
 #include <windows.h>
 #include <d3d11.h>
+#include <vector>
 
 #include "customtypes.h"
 #include "GLRenderer.h"
@@ -26,11 +27,11 @@ public:
             throw std::runtime_error("Failed to create HW Device Context");
         }
 
+        // 4. Initialize Video Sources
         for (const auto& videoContent : videoContents)
         {
             VideoSource* videoSource = new VideoSource();
             if (videoSource->Open(videoContent.filename, hw_ctx)) {
-                // Apply separate fade timings
                 videoSource->SetFadeInDuration(videoContent.fadeInDuration);
                 videoSource->SetFadeOutDuration(videoContent.fadeOutDuration);
                 state.sources.push_back(videoSource);
@@ -40,14 +41,12 @@ public:
             }
         }
 
-        // 4. Allocate shared decoding buffers
+        // 5. Allocate shared decoding buffers
         pkt = av_packet_alloc();
         frm = av_frame_alloc();
         sw_frm = av_frame_alloc();
 
-        // Initialize FPS timer
         state.lastFPSUpdate = glfwGetTime();
-
     }
 
     ~App()
@@ -61,81 +60,33 @@ public:
         if (hw_ctx) av_buffer_unref(&hw_ctx);
     }
 
-    VideoSource* GetSource(int index) {
-        if (index >= 0 && index < (int)state.sources.size()) {
-            return state.sources[index];
-        }
-        return nullptr;
-    }
-
     void Run()
     {
         while (!renderer->ShouldClose()) {
             renderer->PollEvents();
 
-            // 1. Handle Background (Always index 0) with Frame-Rate Limiting
-            VideoSource& background = *state.sources[0];
-            if (!background.IsPaused()) {
-                if (background.GetStartTime() <= 0) background.SetStartTime(glfwGetTime());
+            // 1. Handle Background (Always index 0, Slot 0)
+            // Background loops internally within UpdateAndRender
+            state.sources[0]->UpdateAndRender(renderer, videoShader, frm, sw_frm, pkt, 0);
 
-                double playPos = background.GetCurrentPlayPosition(glfwGetTime());
-
-                // Only decode a new frame if the video time has advanced
-                if (playPos > state.lastBackgroundPTS) {
-                    // UPDATED: Background now uses Slot 0
-                    UpdateAndDraw(background, 1.0f, 0);
-                    state.lastBackgroundPTS = playPos;
-                }
-                else {
-                    // Re-render existing texture to maintain VSync without stuttering
-                    videoShader->Use();
-                    glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), 1.0f);
-                    // UPDATED: Background now uses Slot 0
-                    renderer->Render(videoShader->programID, 0);
-                }
-            }
-
-            // 2. Handle Foreground Interrupts
+            // 2. Handle Foreground Interrupts (Slot 1)
             if (state.activeIndex != 0) {
-                VideoSource& foreground = *state.sources[state.activeIndex];
+                VideoSource* foreground = state.sources[state.activeIndex];
 
-                if (foreground.GetStartTime() <= 0) foreground.SetStartTime(glfwGetTime());
-
-                double currentTime = glfwGetTime();
-                double elapsed = currentTime - foreground.GetAdjustedStartTime();
-                double totalDuration = foreground.GetDurationInSeconds();
-
-                float inDur = foreground.GetFadeInDuration();
-                float outDur = foreground.GetFadeOutDuration();
-                float alpha = 1.0f;
-
-                // Fade In Logic
-                if (elapsed < inDur && inDur > 0) {
-                    alpha = (float)(elapsed / inDur);
+                // If UpdateAndRender returns false, it reached the end of file
+                if (!foreground->UpdateAndRender(renderer, videoShader, frm, sw_frm, pkt, 1)) {
+                    state.activeIndex = 0; // Return to background
                 }
-                // Fade Out Logic near the end of the file
-                else if (elapsed > (totalDuration - outDur) && outDur > 0) {
-                    double timeRemaining = totalDuration - elapsed;
-                    alpha = (float)(timeRemaining / outDur);
-                }
-
-                if (alpha < 0.0f) alpha = 0.0f;
-                if (alpha > 1.0f) alpha = 1.0f;
-
-                // UPDATED: Foreground now uses Slot 1
-                UpdateAndDraw(foreground, alpha, 1);
             }
 
             renderer->SwapBuffers();
 
-            // --- FPS CALCULATION ---
+            // FPS Tracking
             state.frameCount++;
             double currentTime = glfwGetTime();
 
-            // Update the console every 1.0 seconds
             if (currentTime - state.lastFPSUpdate >= 1.0) {
                 std::cout << "FPS: " << state.frameCount << std::endl;
-
                 state.frameCount = 0;
                 state.lastFPSUpdate = currentTime;
             }
@@ -151,51 +102,6 @@ private:
     AVFrame* frm = nullptr;
     AVFrame* sw_frm = nullptr;
 
-    void UpdateAndDraw(VideoSource& source, float alphaValue, int slot) {
-        bool frameReady = false;
-        while (!frameReady) {
-            if (av_read_frame(source.GetFmtCtx(), pkt) >= 0) {
-                if (pkt->stream_index == source.GetStreamIdx()) {
-                    avcodec_send_packet(source.GetCodecCtx(), pkt);
-                    if (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) {
-                        av_hwframe_transfer_data(sw_frm, frm, 0);
-
-                        renderer->UpdateVideoTextures(slot,
-                            sw_frm->width, sw_frm->height,
-                            sw_frm->linesize[0], sw_frm->data[0],
-                            sw_frm->linesize[1], sw_frm->data[1]
-                        );
-
-                        videoShader->Use();
-                        glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), alphaValue);
-                        renderer->Render(videoShader->programID, slot);
-
-                        av_frame_unref(sw_frm);
-                        av_frame_unref(frm);
-                        frameReady = true;
-                    }
-                }
-                av_packet_unref(pkt);
-            }
-            else {
-                // End of stream handling
-                if (state.activeIndex != 0 && &source == state.sources[state.activeIndex]) {
-                    // Drain the decoder before switching back to background
-                    avcodec_send_packet(source.GetCodecCtx(), NULL);
-                    while (avcodec_receive_frame(source.GetCodecCtx(), frm) >= 0) { av_frame_unref(frm); }
-
-                    state.activeIndex = 0; // Return to background view
-                }
-                else {
-                    // Loop background without resetting fade timer
-                    source.Restart(glfwGetTime(), false);
-                    state.lastBackgroundPTS = -1.0; // Reset PTS tracker for smooth loop
-                }
-                frameReady = true;
-            }
-        }
-    }
-
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
         if (action != GLFW_PRESS) return;
 
@@ -207,7 +113,7 @@ private:
 
             int nextIdx;
             if (state.lastForegroundIndex == 0) {
-                nextIdx = 1; // Start with first foreground video
+                nextIdx = 1;
             }
             else {
                 nextIdx = state.lastForegroundIndex + dir;
@@ -218,7 +124,9 @@ private:
             state.activeIndex = nextIdx;
             state.lastForegroundIndex = nextIdx;
 
-            state.sources[state.activeIndex]->Restart(glfwGetTime(), true);
+            // Two-step logic: Rewind decoder, then set logical start for fades
+            state.sources[state.activeIndex]->Rewind();
+            state.sources[state.activeIndex]->StartPlayback(glfwGetTime());
         }
 
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
