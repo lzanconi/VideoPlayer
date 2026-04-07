@@ -4,19 +4,26 @@
 #include <d3d11.h>
 #include <vector>
 
+
 #include "customtypes.h"
-#include "GLRenderer.h"
+#include "GLRenderer.h" 
 #include "ShaderProgram.h"
 #include "VideoSource.h"
+
+// Note: We include GLRenderer.h only here in the implementation-heavy header 
+// or move the constructor logic to a .cpp to fully isolate the interface.
+
 
 class App
 {
 public:
     App(int width, int height, const std::string& title, const std::vector<VideoContent>& videoContents)
     {
-        // 1. Initialize Renderer and set the global reference
-        renderer = new GLRenderer(width, height, title.c_str());
-        renderer->SetKeyCallback(App::KeyCallback);
+        // 1. Initialize the concrete Renderer but store it as the Interface
+        GLRenderer* concreteRenderer = new GLRenderer(width, height, title.c_str());
+        concreteRenderer->SetKeyCallback(App::KeyCallback);
+
+        renderer = concreteRenderer; // Assign to IRenderer*
         state.renderer = renderer;
 
         // 2. Load Shaders
@@ -42,8 +49,10 @@ public:
             }
         }
 
-        //Automatically plays the background video when app startup
-        state.sources[0]->Play(glfwGetTime());
+        // Automatically plays the background video
+        if (!state.sources.empty()) {
+            state.sources[0]->Play(glfwGetTime());
+        }
 
         // 5. Allocate shared decoding buffers
         pkt = av_packet_alloc();
@@ -66,6 +75,7 @@ public:
 
     void Run()
     {
+        // Now using IRenderer interface methods
         while (!renderer->ShouldClose()) {
             renderer->PollEvents();
 
@@ -76,7 +86,6 @@ public:
             if (state.activeIndex != 0) {
                 VideoSource* foreground = state.sources[state.activeIndex];
 
-                // If UpdateAndRender returns false, it reached the end of file
                 if (!foreground->UpdateAndRender(renderer, videoShader, frm, sw_frm, pkt, 1)) {
                     state.activeIndex = 0; // Return to background
                 }
@@ -98,7 +107,7 @@ public:
 
 private:
     static AppState state;
-    GLRenderer* renderer;
+    IRenderer* renderer; // Decoupled from GLRenderer
     ShaderProgram* videoShader;
     AVBufferRef* hw_ctx = nullptr;
     AVPacket* pkt = nullptr;
@@ -133,7 +142,6 @@ private:
 
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
 
-        // UPDATED PAUSE LOGIC: Toggles both background and active foreground
         if (key == GLFW_KEY_SPACE) {
             double time = glfwGetTime();
             state.sources[0]->Pause(time);

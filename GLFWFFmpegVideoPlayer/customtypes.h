@@ -1,6 +1,8 @@
 #pragma once
-#include "VideoSource.h"
-#include "GLRenderer.h"
+#include <vector>
+
+class VideoSource;
+class IRenderer;
 
 struct AppState
 {
@@ -9,7 +11,7 @@ struct AppState
     int lastForegroundIndex = 0;
     bool interruptRead = false;
     std::vector<VideoSource*> sources;
-    GLRenderer* renderer = nullptr;
+    IRenderer* renderer = nullptr;
     double lastBackgroundPTS = -1.0;
 
     // FPS Tracking

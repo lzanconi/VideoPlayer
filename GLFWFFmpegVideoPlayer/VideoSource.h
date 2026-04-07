@@ -12,8 +12,11 @@ extern "C" {
 #include <libavutil/imgutils.h>
 }
 
-#include "GLRenderer.h"
+#include "IRenderer.h"
 #include "ShaderProgram.h"
+
+
+
 
 class VideoSource
 {
@@ -94,7 +97,7 @@ public:
     * Responsible managing playback timing, decoding video packets and then, once a frame is completed, render
     * the frame
     */
-    bool UpdateAndRender(GLRenderer* renderer, ShaderProgram* shader, AVFrame* frm, AVFrame* sw_frm, AVPacket* pkt, int slot)
+    bool UpdateAndRender(IRenderer* renderer, ShaderProgram* shader, AVFrame* frm, AVFrame* sw_frm, AVPacket* pkt, int slot)
     {
         //Check if the video source has been successfully opened
         if (!isInitialized) 

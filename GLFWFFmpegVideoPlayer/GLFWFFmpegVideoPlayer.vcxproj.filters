@@ -41,6 +41,9 @@
     <ClInclude Include="customtypes.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="IRenderer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="shader.frag" />

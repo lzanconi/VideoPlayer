@@ -2,10 +2,6 @@
 #include <windows.h>
 #include <d3d11.h>
 
-#include "customtypes.h"
-#include "GLRenderer.h"
-#include "ShaderProgram.h"
-#include "VideoSource.h"
 #include "App.h"
 
 AppState App::state;
