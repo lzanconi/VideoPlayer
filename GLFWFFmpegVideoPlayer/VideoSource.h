@@ -81,7 +81,7 @@ public:
         lastPTS = -1.0;
     }
 
-    void StartPlayback(double currentGLFWTime)
+    void Play(double currentGLFWTime)
     {
         startTime = currentGLFWTime;
         totalPausedTime = 0;
@@ -135,8 +135,7 @@ public:
                 else {
                     if (looped) {
                         Rewind();
-                        startTime = glfwGetTime(); // Reset start time for the new loop
-                        totalPausedTime = 0;
+                        Play(glfwGetTime());
                         frameReady = true;
                     }
                     else {
@@ -173,7 +172,7 @@ public:
         return alpha;
     }
 
-    void TogglePause(double currentGLFWTime)
+    void Pause(double currentGLFWTime)
     {
         if (!isInitialized) 
             return;

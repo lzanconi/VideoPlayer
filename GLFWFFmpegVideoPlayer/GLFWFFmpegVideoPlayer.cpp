@@ -15,7 +15,7 @@ int main()
 	try
 	{
 		std::vector<VideoContent> playlist = {
-			{"Part1.mp4", 0.0f, 0.0f, true},
+			{"full_test.mp4", 0.0f, 0.0f, true},
 			{"1.mp4", 0.0f, 0.0f, true},
 			{"2.mp4", 2.0f, 1.0f, false},
 			{"3.mp4", 2.0f, 0.0f, false}

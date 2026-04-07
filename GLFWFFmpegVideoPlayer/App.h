@@ -43,7 +43,7 @@ public:
         }
 
         //Automatically plays the background video when app startup
-        state.sources[0]->StartPlayback(glfwGetTime());
+        state.sources[0]->Play(glfwGetTime());
 
         // 5. Allocate shared decoding buffers
         pkt = av_packet_alloc();
@@ -128,7 +128,7 @@ private:
             state.lastForegroundIndex = nextIdx;
 
             state.sources[state.activeIndex]->Rewind();
-            state.sources[state.activeIndex]->StartPlayback(glfwGetTime());
+            state.sources[state.activeIndex]->Play(glfwGetTime());
         }
 
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
@@ -136,9 +136,9 @@ private:
         // UPDATED PAUSE LOGIC: Toggles both background and active foreground
         if (key == GLFW_KEY_SPACE) {
             double time = glfwGetTime();
-            state.sources[0]->TogglePause(time);
+            state.sources[0]->Pause(time);
             if (state.activeIndex != 0) {
-                state.sources[state.activeIndex]->TogglePause(time);
+                state.sources[state.activeIndex]->Pause(time);
             }
         }
 
