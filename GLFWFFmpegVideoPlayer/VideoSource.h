@@ -90,17 +90,26 @@ public:
         lastPTS = -1.0;
     }
 
+    /*
+    * Responsible managing playback timing, decoding video packets and then, once a frame is completed, render
+    * the frame
+    */
     bool UpdateAndRender(GLRenderer* renderer, ShaderProgram* shader, AVFrame* frm, AVFrame* sw_frm, AVPacket* pkt, int slot)
     {
-        if (!isInitialized) return true;
+        //Check if the video source has been successfully opened
+        if (!isInitialized) 
+            return true;
 
+        //Retrieves the current time from the GLFW library to synchronize playback later
         double currentTime = glfwGetTime();
 
+        //Ensures the video has been assigned a start time via the Play() method before proceeding
         if (startTime <= 0)
             return true;
 
-        // UPDATED: If paused, calculate alpha based on the frozen pauseTime 
-        // to stop the fade-in/out from progressing.
+        //PAUSED
+        //If the video is paused, it stop processing new frames and show the last rendered frame and the 
+        //same alpha that was computed when paused was triggered 
         if (isPaused) {
             shader->Use();
             glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), CalculateAlpha(pauseTime));
@@ -108,35 +117,63 @@ public:
             return true;
         }
 
+        //"playPos" determines where we are in the video stream by subtracting the start time 
+        //(and any accumulated pause duration) from the current time
         double playPos = currentTime - GetAdjustedStartTime();
+        
+        //Compute the current fade-in or fade-out transparency level
         float alpha = CalculateAlpha(currentTime);
 
+        //If the current playback time "playPos" is ahead of the last displayed frame's timestamp (lastPTS),
+        //it's time to decode a new frame
         if (playPos > lastPTS) {
-            bool frameReady = false;
-            while (!frameReady) {
-                if (av_read_frame(formatCtx, pkt) >= 0) {
-                    if (pkt->stream_index == streamID) {
+
+            //Ensures that the application successfully retrieves all the necessary data to 
+            //produce a complete frame
+            bool frameCompleted = false;
+
+            //FRAME DECODING LOOP
+            //While a frame is not yet completed...
+            while (!frameCompleted) 
+            {
+                //Fetches raw packet (compressed data) from FFmpeg format context
+                if (av_read_frame(formatCtx, pkt) >= 0) 
+                {
+                    //Ensures the packet belongs to the video stream
+                    if (pkt->stream_index == streamID) 
+                    {
+                        //Send the compressed packet to the FFmpeg codec context for decompression
                         avcodec_send_packet(codecCtx, pkt);
-                        if (avcodec_receive_frame(codecCtx, frm) >= 0) {
+
+                        //Attempts to pull a decoded YUV frame from the decoder
+                        if (avcodec_receive_frame(codecCtx, frm) >= 0) 
+                        {
+                            //Copy the frame from the GPU hardware decoder memory to software-accessible buffer (sw_frm)
                             av_hwframe_transfer_data(sw_frm, frm, 0);
 
+                            //Sends the raw Y (luminance) and UV (chrominance) data to the OpenGL renderer to update
+                            //the textures for the specific slot
                             renderer->UpdateVideoTextures(slot,
                                 sw_frm->width, sw_frm->height,
                                 sw_frm->linesize[0], sw_frm->data[0],
                                 sw_frm->linesize[1], sw_frm->data[1]
                             );
 
+                            //Updates "lastPts" to the current position and exits the loop because the current frame 
+                            //has been completed and it's ready to be rendered by the "Render()" method 
                             lastPTS = playPos;
-                            frameReady = true;
+                            frameCompleted = true;
                         }
                     }
                     av_packet_unref(pkt);
                 }
+                //LOOP
+                //The video has reached its end, check if has to loop
                 else {
                     if (looped) {
                         Rewind();
                         Play(glfwGetTime());
-                        frameReady = true;
+                        frameCompleted = true;
                     }
                     else {
                         return false;
@@ -145,6 +182,8 @@ public:
             }
         }
 
+        //RENDER THE FRAME
+        //Finally render the frame using the computed alpha
         shader->Use();
         glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), alpha);
         renderer->Render(shader->programID, slot);
@@ -154,7 +193,6 @@ public:
 
     float CalculateAlpha(double currentTime)
     {
-        // UPDATED: Use GetAdjustedStartTime() so 'elapsed' accounts for totalPausedTime.
         double elapsed = currentTime - GetAdjustedStartTime();
         double totalDuration = GetDurationInSeconds();
         float alpha = 1.0f;
