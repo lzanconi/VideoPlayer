@@ -46,14 +46,16 @@ public:
 		glfwTerminate();
 	}
 
-	// Updated to accept a 'slot' (0 for foreground, 1 for background)
+	// Updated to invert Slot 0 (Background) and Slot 1 (Foreground)
 	void UpdateVideoTextures(int slot, int w, int h, int lsY, uint8_t* dY, int lsUV, uint8_t* dUV)
 	{
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-		// Select which texture set to update based on the slot
-		GLuint currentY = (slot == 0) ? yTex : yTex2;
-		GLuint currentUV = (slot == 0) ? uvTex : uvTex2;
+		// UPDATED LOGIC:
+		// Slot 0 is now Background -> yTex2 / uvTex2
+		// Slot 1 is now Foreground -> yTex / uvTex
+		GLuint currentY = (slot == 0) ? yTex2 : yTex;
+		GLuint currentUV = (slot == 0) ? uvTex2 : uvTex;
 
 		// Use texture units 0 & 1 for slot 0, and 2 & 3 for slot 1
 		glActiveTexture(GL_TEXTURE0 + (slot * 2));
@@ -86,7 +88,6 @@ public:
 		glfwSwapInterval(1);
 	}
 
-	// Updated Render to bind the correct texture units for the specific slot
 	void Render(unsigned int shaderProgramID, int slot)
 	{
 		int dw, dh;
@@ -95,7 +96,7 @@ public:
 
 		glUseProgram(shaderProgramID);
 
-		// Manually update the sampler uniforms to point to the correct texture units
+		// Point sampler uniforms to the correct texture units based on slot
 		glUniform1i(glGetUniformLocation(shaderProgramID, "yTexture"), slot * 2);
 		glUniform1i(glGetUniformLocation(shaderProgramID, "uvTexture"), (slot * 2) + 1);
 
@@ -111,8 +112,8 @@ public:
 private:
 	GLFWwindow* window;
 	unsigned int VAO, VBO, EBO;
-	unsigned int yTex, uvTex;   // Slot 0 (Foreground)
-	unsigned int yTex2, uvTex2; // Slot 1 (Background)
+	unsigned int yTex, uvTex;   // Now used for Slot 1 (Foreground)
+	unsigned int yTex2, uvTex2; // Now used for Slot 0 (Background)
 	bool isFullscreen = false;
 	int winX = 100, winY = 100, winW = 1280, winH = 720;
 

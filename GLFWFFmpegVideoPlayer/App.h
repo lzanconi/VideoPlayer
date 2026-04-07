@@ -82,14 +82,16 @@ public:
 
                 // Only decode a new frame if the video time has advanced
                 if (playPos > state.lastBackgroundPTS) {
-                    UpdateAndDraw(background, 1.0f, 1);
+                    // UPDATED: Background now uses Slot 0
+                    UpdateAndDraw(background, 1.0f, 0);
                     state.lastBackgroundPTS = playPos;
                 }
                 else {
                     // Re-render existing texture to maintain VSync without stuttering
                     videoShader->Use();
                     glUniform1f(glGetUniformLocation(videoShader->programID, "uAlpha"), 1.0f);
-                    renderer->Render(videoShader->programID, 1);
+                    // UPDATED: Background now uses Slot 0
+                    renderer->Render(videoShader->programID, 0);
                 }
             }
 
@@ -120,7 +122,8 @@ public:
                 if (alpha < 0.0f) alpha = 0.0f;
                 if (alpha > 1.0f) alpha = 1.0f;
 
-                UpdateAndDraw(foreground, alpha, 0); // Slot 0
+                // UPDATED: Foreground now uses Slot 1
+                UpdateAndDraw(foreground, alpha, 1);
             }
 
             renderer->SwapBuffers();
