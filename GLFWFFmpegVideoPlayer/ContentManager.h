@@ -9,6 +9,9 @@ namespace fs = std::filesystem;
 
 class ContentManager
 {
+private:
+    std::vector<VideoContent> videoContents;
+
 public:
 	ContentManager() = default;
 
@@ -30,6 +33,15 @@ public:
                     content.fadeInDuration = 1.0f;
                     content.fadeOutDuration = 1.0f;
                     content.looped = false;
+
+                    fs::path csvPath = entry.path();
+                    csvPath.replace_extension(".csv");
+
+                    if (fs::exists(csvPath)) 
+                    {
+                        std::cout << "ContentManager: Found matching CSV for " << entry.path().filename() << std::endl;
+                        LoadPositionsIntoContent(content, csvPath.string());
+                    }
 
                     videoContents.push_back(content);
                 }
@@ -58,5 +70,28 @@ public:
 	}
 
 private:
-	std::vector<VideoContent> videoContents;
+	
+
+    void LoadPositionsIntoContent(VideoContent& content, const std::string& csvPath) {
+        std::ifstream file(csvPath);
+        if (!file.is_open()) return;
+
+        content.positions.clear(); // Clear existing positions
+        std::string line;
+        while (std::getline(file, line)) {
+            std::stringstream ss(line);
+            std::string value;
+            while (std::getline(ss, value, ',')) {
+                try {
+                    if (!value.empty()) {
+                        float pos = std::stof(value);
+                        content.positions.push_back(pos);
+                    }
+                }
+                catch (...) {
+                    // Skip invalid numeric entries
+                }
+            }
+        }
+    }
 };
