@@ -95,8 +95,8 @@ public:
 
         double currentTime = glfwGetTime();
 
-        if (startTime <= 0) 
-            StartPlayback(currentTime);
+        if (startTime <= 0)
+            return true;
 
         // UPDATED: If paused, calculate alpha based on the frozen pauseTime 
         // to stop the fade-in/out from progressing.

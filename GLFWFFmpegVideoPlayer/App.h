@@ -41,6 +41,9 @@ public:
             }
         }
 
+        //Automatically plays the background video when app startup
+        state.sources[0]->StartPlayback(glfwGetTime());
+
         // 5. Allocate shared decoding buffers
         pkt = av_packet_alloc();
         frm = av_frame_alloc();
