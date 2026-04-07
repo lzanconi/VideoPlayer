@@ -147,6 +147,7 @@ copy /y "$(ProjectDir)shader.frag" "$(OutDir)shader.frag"</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
+    <ClInclude Include="ConfigManager.h" />
     <ClInclude Include="customtypes.h" />
     <ClInclude Include="GLRenderer.h" />
     <ClInclude Include="IRenderer.h" />
