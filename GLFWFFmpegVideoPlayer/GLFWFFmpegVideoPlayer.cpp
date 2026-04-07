@@ -2,7 +2,6 @@
 #include <windows.h>
 #include <d3d11.h>
 
-#include "ConfigManager.h"
 #include "App.h"
 
 
@@ -12,16 +11,15 @@ int main()
 {
 	try
 	{
-		/*std::vector<VideoContent> playlist = {
+		std::vector<VideoContent> videoContents = {
 			{"full_test.mp4", 0.0f, 0.0f, true},
 			{"1.mp4", 0.0f, 0.0f, true},
 			{"2.mp4", 2.0f, 1.0f, false},
 			{"3.mp4", 2.0f, 0.0f, false}
-		};*/
+		};
 
-		ConfigManager configMgr("videocontents.txt");
 
-		App app(1280, 720, "Video Player", configMgr.GetVideoContents());
+		App app(1280, 720, "Video Player", videoContents);
 		app.Run();
 	}
 	catch (const std::exception& e) {

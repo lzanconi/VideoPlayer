@@ -25,4 +25,5 @@ struct VideoContent
     float fadeInDuration = 2.5f;
     float fadeOutDuration = 1.0f;
     bool looped = false;
+    std::vector<float> positions;
 };
