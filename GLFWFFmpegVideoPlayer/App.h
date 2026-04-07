@@ -66,7 +66,6 @@ public:
             renderer->PollEvents();
 
             // 1. Handle Background (Always index 0, Slot 0)
-            // Background loops internally within UpdateAndRender
             state.sources[0]->UpdateAndRender(renderer, videoShader, frm, sw_frm, pkt, 0);
 
             // 2. Handle Foreground Interrupts (Slot 1)
@@ -124,13 +123,21 @@ private:
             state.activeIndex = nextIdx;
             state.lastForegroundIndex = nextIdx;
 
-            // Two-step logic: Rewind decoder, then set logical start for fades
             state.sources[state.activeIndex]->Rewind();
             state.sources[state.activeIndex]->StartPlayback(glfwGetTime());
         }
 
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
-        if (key == GLFW_KEY_SPACE) state.sources[state.activeIndex]->TogglePause(glfwGetTime());
+
+        // UPDATED PAUSE LOGIC: Toggles both background and active foreground
+        if (key == GLFW_KEY_SPACE) {
+            double time = glfwGetTime();
+            state.sources[0]->TogglePause(time);
+            if (state.activeIndex != 0) {
+                state.sources[state.activeIndex]->TogglePause(time);
+            }
+        }
+
         if (key == GLFW_KEY_F && state.renderer) state.renderer->ToggleFullscreen();
     }
 };

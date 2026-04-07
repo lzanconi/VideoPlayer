@@ -72,10 +72,6 @@ public:
         return true;
     }
 
-    /**
-     * Resets the FFmpeg stream position and clears internal decoder buffers.
-     * Use this to prepare the video to play from the start without affecting playback timers.
-     */
     void Rewind()
     {
         if (!isInitialized) return;
@@ -84,10 +80,6 @@ public:
         lastPTS = -1.0;
     }
 
-    /**
-     * Initializes the playback timing state.
-     * Use this to trigger a fresh start (e.g., triggering the Fade-In effect).
-     */
     void StartPlayback(double currentGLFWTime)
     {
         startTime = currentGLFWTime;
@@ -97,22 +89,20 @@ public:
         lastPTS = -1.0;
     }
 
-    /**
-     * Updates and renders the video frame.
-     * Returns true if playing, false if finished (foreground only).
-     */
     bool UpdateAndRender(GLRenderer* renderer, ShaderProgram* shader, AVFrame* frm, AVFrame* sw_frm, AVPacket* pkt, int slot)
     {
         if (!isInitialized) return true;
 
         double currentTime = glfwGetTime();
 
-        // Auto-initialize timing if it hasn't been set yet
-        if (startTime <= 0) StartPlayback(currentTime);
+        if (startTime <= 0) 
+            StartPlayback(currentTime);
 
+        // UPDATED: If paused, calculate alpha based on the frozen pauseTime 
+        // to stop the fade-in/out from progressing.
         if (isPaused) {
             shader->Use();
-            glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), CalculateAlpha(currentTime));
+            glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), CalculateAlpha(pauseTime));
             renderer->Render(shader->programID, slot);
             return true;
         }
@@ -120,7 +110,6 @@ public:
         double playPos = currentTime - GetAdjustedStartTime();
         float alpha = CalculateAlpha(currentTime);
 
-        // 1. Decode Loop: Only decode a new frame if video time has advanced
         if (playPos > lastPTS) {
             bool frameReady = false;
             while (!frameReady) {
@@ -143,21 +132,17 @@ public:
                     av_packet_unref(pkt);
                 }
                 else {
-                    // End of Stream handling
                     if (slot == 0) {
-                        // Background (Slot 0) loops forever by rewinding
                         Rewind();
                         frameReady = true;
                     }
                     else {
-                        // Foreground (Slot 1) signals it is finished
                         return false;
                     }
                 }
             }
         }
 
-        // 2. Render Call: Maintains VSync even if no new frame was decoded
         shader->Use();
         glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), alpha);
         renderer->Render(shader->programID, slot);
@@ -167,6 +152,7 @@ public:
 
     float CalculateAlpha(double currentTime)
     {
+        // UPDATED: Use GetAdjustedStartTime() so 'elapsed' accounts for totalPausedTime.
         double elapsed = currentTime - GetAdjustedStartTime();
         double totalDuration = GetDurationInSeconds();
         float alpha = 1.0f;
@@ -186,7 +172,9 @@ public:
 
     void TogglePause(double currentGLFWTime)
     {
-        if (!isInitialized) return;
+        if (!isInitialized) 
+            return;
+        
         if (!isPaused) {
             pauseTime = currentGLFWTime;
             isPaused = true;
@@ -204,9 +192,11 @@ public:
         isInitialized = false;
     }
 
-    // Helpers
-    double GetDurationInSeconds() const {
-        if (!formatCtx || streamID < 0) return 0;
+    double GetDurationInSeconds() const 
+    {
+        if (!formatCtx || streamID < 0) 
+            return 0;
+
         return (double)formatCtx->streams[streamID]->duration * av_q2d(formatCtx->streams[streamID]->time_base);
     }
 
