@@ -43,6 +43,7 @@ public:
                         LoadCSVPositions(content, csvPath.string());
                     }
 
+                    
                     videoContents.push_back(content);
                 }
             }
@@ -57,6 +58,9 @@ public:
                 std::rotate(videoContents.begin(), it, it + 1);
             }
 
+            videoContents.at(0).looped = true;
+            videoContents.at(0).fadeInDuration = 0.0f;
+            videoContents.at(0).fadeOutDuration = 0.0f;
             std::cout << "ContentManager: Loaded " << videoContents.size() << " videos." << std::endl;
         }
         catch (const fs::filesystem_error& e) {

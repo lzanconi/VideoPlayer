@@ -18,16 +18,8 @@ int main()
 			{"3.mp4", 2.0f, 0.0f, false}
 		};*/
 
-		ContentManager contentMgr;
-		contentMgr.LoadVideoContentFromFolder(".");
 
-		if (contentMgr.GetVideoContents().empty()) {
-			std::cerr << "No .mp4 files found." << std::endl;
-			return -1;
-		}
-
-
-		App app(1280, 720, "Video Player", contentMgr.GetVideoContents());
+		App app(1280, 720, "Video Player");
 		app.Run();
 	}
 	catch (const std::exception& e) {

@@ -9,6 +9,7 @@
 #include "GLRenderer.h" 
 #include "ShaderProgram.h"
 #include "VideoSource.h"
+#include "ContentManager.h"
 
 // Note: We include GLRenderer.h only here in the implementation-heavy header 
 // or move the constructor logic to a .cpp to fully isolate the interface.
@@ -17,8 +18,15 @@
 class App
 {
 public:
-    App(int width, int height, const std::string& title, const std::vector<VideoContent>& videoContents)
+    App(int width, int height, const std::string& title)
     {
+        ContentManager contentMgr;
+        contentMgr.LoadVideoContentFromFolder(".\\Videos");
+
+        if (contentMgr.GetVideoContents().empty()) {
+            std::cerr << "No .mp4 files found." << std::endl;
+        }
+
         // 1. Initialize the concrete Renderer but store it as the Interface
         GLRenderer* concreteRenderer = new GLRenderer(width, height, title.c_str());
         concreteRenderer->SetKeyCallback(App::KeyCallback);
@@ -35,7 +43,7 @@ public:
         }
 
         // 4. Initialize Video Sources
-        for (const auto& videoContent : videoContents)
+        for (const auto& videoContent : contentMgr.GetVideoContents())
         {
             VideoSource* videoSource = new VideoSource();
             if (videoSource->Open(videoContent.filename, hw_ctx)) {
