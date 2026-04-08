@@ -19,7 +19,7 @@ int main()
 		};*/
 
 		ContentManager contentMgr;
-		contentMgr.LoadFromFolder(".");
+		contentMgr.LoadVideoContentFromFolder(".");
 
 		if (contentMgr.GetVideoContents().empty()) {
 			std::cerr << "No .mp4 files found." << std::endl;

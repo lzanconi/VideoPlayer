@@ -15,7 +15,7 @@ private:
 public:
 	ContentManager() = default;
 
-    void LoadFromFolder(const std::string& folderPath) {
+    void LoadVideoContentFromFolder(const std::string& folderPath) {
         videoContents.clear();
 
         try {
@@ -40,7 +40,7 @@ public:
                     if (fs::exists(csvPath)) 
                     {
                         std::cout << "ContentManager: Found matching CSV for " << entry.path().filename() << std::endl;
-                        LoadPositionsIntoContent(content, csvPath.string());
+                        LoadCSVPositions(content, csvPath.string());
                     }
 
                     videoContents.push_back(content);
@@ -72,7 +72,7 @@ public:
 private:
 	
 
-    void LoadPositionsIntoContent(VideoContent& content, const std::string& csvPath) {
+    void LoadCSVPositions(VideoContent& content, const std::string& csvPath) {
         std::ifstream file(csvPath);
         if (!file.is_open()) return;
 
