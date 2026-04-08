@@ -16,7 +16,7 @@
 // or move the constructor logic to a .cpp to fully isolate the interface.
 
 
-class App
+class App : public IApp
 {
 public:
     App(int width, int height, const std::string& title)
@@ -35,10 +35,10 @@ public:
         renderer = concreteRenderer; // Assign to IRenderer*
         state.renderer = renderer;
 
-        NetworkManager* networkMgr = new NetworkManager("127.0.0.1", 8080);
+        NetworkManager* networkMgr = new NetworkManager("127.0.0.1", 5555, this);
         state.networkMgr = networkMgr;
 
-        state.networkMgr->Start();
+        
 
         // 2. Load Shaders
         videoShader = new ShaderProgram("shader.vert", "shader.frag");
@@ -56,6 +56,7 @@ public:
                 videoSource->SetFadeInDuration(videoContent.fadeInDuration);
                 videoSource->SetFadeOutDuration(videoContent.fadeOutDuration);
                 videoSource->SetLooped(videoContent.looped);
+                videoSource->positions = videoContent.positions;
                 state.sources.push_back(videoSource);
             }
             else {
@@ -74,6 +75,8 @@ public:
         sw_frm = av_frame_alloc();
 
         state.lastFPSUpdate = glfwGetTime();
+
+        state.networkMgr->Start();
     }
 
     ~App()
@@ -87,6 +90,28 @@ public:
         av_frame_free(&sw_frm);
         av_packet_free(&pkt);
         if (hw_ctx) av_buffer_unref(&hw_ctx);
+    }
+
+    VideoSource* GetBackgroundVideo() override {
+        if (state.sources.empty()) 
+            return nullptr;
+        
+        return state.sources[0]; // Returns background VideoSource
+    }
+
+    std::vector<float> GetPositions() override
+    {
+        return state.sources[0]->positions;
+    }
+
+    double GetLastPTS() override
+    {
+        return state.sources[0]->GetLastPTS();
+    }
+
+    int64_t GetBGCaptureTimeNS() override
+    {
+        return state.sources[0]->GetBGCaptureTimeNS();
     }
 
     void Run()

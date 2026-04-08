@@ -36,8 +36,12 @@ private:
 
     float fadeInDuration = 2.5f;
     float fadeOutDuration = 1.0f;
+    int64_t bg_capture_time_ns;
+    
 
 public:
+    std::vector<float> positions;
+
     VideoSource() = default;
 
     ~VideoSource()
@@ -187,6 +191,10 @@ public:
 
         //RENDER THE FRAME
         //Finally render the frame using the computed alpha
+        bg_capture_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count(); 
+
         shader->Use();
         glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), alpha);
         renderer->Render(shader->programID, slot);
@@ -244,8 +252,10 @@ public:
     }
 
     void SetLooped(bool l) { looped = l; }
-
+    double GetLastPTS() { return lastPTS;  }
     double GetAdjustedStartTime() const { return startTime + totalPausedTime; }
+    int64_t GetBGCaptureTimeNS() { return bg_capture_time_ns;  }
+
     bool IsPaused() const { return isPaused; }
     void SetFadeInDuration(float d) { fadeInDuration = d; }
     void SetFadeOutDuration(float d) { fadeOutDuration = d; }
