@@ -1,2 +1,2 @@
 # VideoPlayer
-An FFMPEG + GLFW + GLAD Zero-Copy video player for Intel integrated GPU
+An FFMPEG + GLFW + GLAD Zero-Copy video player for Intel integrated GPU and NVidia GPU on Windows
