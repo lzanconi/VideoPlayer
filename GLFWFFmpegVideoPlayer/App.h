@@ -1,15 +1,16 @@
 #pragma once
-#include <iostream>
+#define WIN32_LEAN_AND_MEAN
+#include "NetworkManager.h"
 #include <windows.h>
+#include <iostream>
 #include <d3d11.h>
 #include <vector>
-
-
 #include "customtypes.h"
 #include "GLRenderer.h" 
 #include "ShaderProgram.h"
 #include "VideoSource.h"
 #include "ContentManager.h"
+
 
 // Note: We include GLRenderer.h only here in the implementation-heavy header 
 // or move the constructor logic to a .cpp to fully isolate the interface.
@@ -33,6 +34,11 @@ public:
 
         renderer = concreteRenderer; // Assign to IRenderer*
         state.renderer = renderer;
+
+        NetworkManager* networkMgr = new NetworkManager("127.0.0.1", 8080);
+        state.networkMgr = networkMgr;
+
+        state.networkMgr->Start();
 
         // 2. Load Shaders
         videoShader = new ShaderProgram("shader.vert", "shader.frag");
@@ -72,6 +78,8 @@ public:
 
     ~App()
     {
+        if (state.networkMgr)
+            delete state.networkMgr;
         if (renderer) delete renderer;
         if (videoShader) delete videoShader;
         for (auto source : state.sources) delete source;
@@ -121,6 +129,7 @@ private:
     AVPacket* pkt = nullptr;
     AVFrame* frm = nullptr;
     AVFrame* sw_frm = nullptr;
+    
 
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
         if (action != GLFW_PRESS) return;

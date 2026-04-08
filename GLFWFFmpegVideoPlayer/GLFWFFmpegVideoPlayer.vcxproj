@@ -100,7 +100,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\ffmpeg-8.1-dev\include;C:\glfw-3.4.bin.WIN64\include;C:\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -109,8 +109,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\glfw-3.4.bin.WIN64\lib-vc2022;C:\ffmpeg-8.1-dev\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swresample.lib;
-glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swresample.lib;ws2_32.lib;glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy /y "$(ProjectDir)shader.vert" "$(OutDir)shader.vert"
@@ -123,7 +122,7 @@ copy /y "$(ProjectDir)shader.frag" "$(OutDir)shader.frag"</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\ffmpeg-8.1-dev\include;C:\glfw-3.4.bin.WIN64\include;C:\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -132,8 +131,7 @@ copy /y "$(ProjectDir)shader.frag" "$(OutDir)shader.frag"</Command>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\glfw-3.4.bin.WIN64\lib-vc2022;C:\ffmpeg-8.1-dev\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swresample.lib;
-glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swresample.lib;ws2_32.lib;glfw3.lib;opengl32.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy /y "$(ProjectDir)shader.vert" "$(OutDir)shader.vert"
@@ -151,6 +149,7 @@ copy /y "$(ProjectDir)shader.frag" "$(OutDir)shader.frag"</Command>
     <ClInclude Include="customtypes.h" />
     <ClInclude Include="GLRenderer.h" />
     <ClInclude Include="IRenderer.h" />
+    <ClInclude Include="NetworkManager.h" />
     <ClInclude Include="ShaderProgram.h" />
     <ClInclude Include="VideoSource.h" />
   </ItemGroup>
