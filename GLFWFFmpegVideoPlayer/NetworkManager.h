@@ -168,7 +168,7 @@ private:
             float val1 = positions[idx1];
 
             float calculated_csv_pos = (float)(val0 * (1.0 - frac) + val1 * frac);
-            //std::cout << "POS: " << calculated_csv_pos << std::endl;
+            std::cout << "POS: " << calculated_csv_pos << std::endl;
 
             char buffer[128];
             int len = snprintf(buffer, sizeof(buffer), "{\"positions\":[%.4f]}", calculated_csv_pos);

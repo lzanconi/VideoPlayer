@@ -65,9 +65,9 @@ public:
         }
 
         // Automatically plays the background video
-        if (!state.sources.empty()) {
+        /*if (!state.sources.empty()) {
             state.sources[0]->Play(glfwGetTime());
-        }
+        }*/
 
         // 5. Allocate shared decoding buffers
         pkt = av_packet_alloc();
@@ -180,6 +180,12 @@ private:
 
             state.sources[state.activeIndex]->Rewind();
             state.sources[state.activeIndex]->Play(glfwGetTime());
+        }
+
+        if (key == GLFW_KEY_ENTER) {
+            if (!state.sources.empty()) {
+                state.sources[0]->Play(glfwGetTime());
+            }
         }
 
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
