@@ -48,6 +48,13 @@ C:\Libraries\ffmpeg\lib<br><br>
 ## Add Video folder
 Inside **x64\Debug** build folder, create a **Videos** folder and put your videos inside of it<br>
 
+## RUN
+Go to the **PythonCode** folder and run the positions manager emulator:<br>
+**python PositionsManagerEmu.py**<br><br>
+
+Run the application from Visual Studio (or from the executable).
+Press **enter** to start the background video and it should send the positions to the 
+position manager emulator.
 
 
 
