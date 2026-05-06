@@ -36,7 +36,7 @@ private:
 
     float fadeInDuration = 2.5f;
     float fadeOutDuration = 1.0f;
-    int64_t bg_capture_time_ns;
+    std::atomic<int64_t> bg_capture_time_ns;
     
 
 public:
