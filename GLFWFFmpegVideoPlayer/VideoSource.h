@@ -49,42 +49,75 @@ public:
         Close();
     }
 
+    /*
+	* Responsible for opening the video file, initializing the FFmpeg format and codec contexts, and setting up hardware acceleration
+    */
     bool Open(const std::string& file, AVBufferRef* hwDeviceCtx)
     {
         filename = file;
+        //Opens the video and reads the header to understand the container format
         if (avformat_open_input(&formatCtx, file.c_str(), NULL, NULL) < 0) {
             std::cerr << "Failed to open: " << file << std::endl;
             return false;
         }
 
-        if (avformat_find_stream_info(formatCtx, NULL) < 0) return false;
-
+		//Analyzes the file to get detailed information about the streams (video, audio, etc.)
+        if (avformat_find_stream_info(formatCtx, NULL) < 0) 
+            return false;
+        
+        //Specifically searches for the primary video stream within the file and returns its index
         streamID = av_find_best_stream(formatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
-        if (streamID < 0) return false;
+        if (streamID < 0) 
+            return false;
 
+		//Looks up the appropriate decoder for (like H.264, HEVC, VP9 etc.) based on the video's codec ID
         const AVCodec* decoder = avcodec_find_decoder(formatCtx->streams[streamID]->codecpar->codec_id);
+        //Creates a codec context which holds the settings and state for the decoding process
         codecCtx = avcodec_alloc_context3(decoder);
+        //Copies the settings from the file (like resolution and framerate) into the decoder context
         avcodec_parameters_to_context(codecCtx, formatCtx->streams[streamID]->codecpar);
 
+        //Receives a reference to a hardware device context (created in App.h) and assigns it to the codec
         codecCtx->hw_device_ctx = av_buffer_ref(hwDeviceCtx);
-        codecCtx->get_format = [](AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) {
-            for (const enum AVPixelFormat* p = pix_fmts; *p != -1; p++) {
+        //Tells FFmpeg to pick AV_PIX_FMT_D3D11 format if it can to ensure the decoding happens directly on the GPU rather than the CPU
+        codecCtx->get_format = [](AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) 
+        {
+            for (const enum AVPixelFormat* p = pix_fmts; *p != -1; p++) 
+            {
                 if (*p == AV_PIX_FMT_D3D11) return *p;
             }
             return AV_PIX_FMT_NONE;
-            };
+        };
 
-        if (avcodec_open2(codecCtx, decoder, NULL) < 0) return false;
+        //Opens the decoder with the configured settings
+        if (avcodec_open2(codecCtx, decoder, NULL) < 0) 
+            return false;
 
+		//Sets isInitialized to true allowing UpdateAndRender() to start processing frames
         isInitialized = true;
         return true;
     }
 
+    /*
+    * Rewinds a video to its very first frame. 
+    */
     void Rewind()
     {
-        if (!isInitialized) return;
+        if (!isInitialized) 
+            return;
+
+        //AVSEEK_FLAG_BACKWARD tells the decoder to find the nearest keyframe (a complete image) at or 
+        //before the timestamp of 0
         av_seek_frame(formatCtx, streamID, 0, AVSEEK_FLAG_BACKWARD);
+        //Because video decoders often "look ahead" and store several frames in memory to handle compression,
+        //simply moving the file pointer is not enough.
+        //Flushing clears out any leftover data from the previous playback position, preventing the player from 
+		//accidentally showing "ghost frames" from the end of the video when it starts over.
         avcodec_flush_buffers(codecCtx);
+
+        //The lastPTS variable is used by the UpdateAndRender function to track the timing of the last displayed frame. 
+        //Resetting this value synchronizes the internal logic, signaling to the application that it is now ready to process 
+        //a brand-new sequence of frames starting from time zero.
         lastPTS = -1.0;
     }
 
@@ -98,8 +131,8 @@ public:
     }
 
     /*
-    * Responsible managing playback timing, decoding video packets and then, once a frame is completed, render
-    * the frame
+    * It is the central "engine" of each video stream. 
+    * It manages playback timing, handles the decoding of raw packets into frames, and triggers the final render for a specific video layer.
     */
     bool UpdateAndRender(IRenderer* renderer, ShaderProgram* shader, AVFrame* frm, AVFrame* sw_frm, AVPacket* pkt, int slot)
     {
@@ -115,9 +148,10 @@ public:
             return true;
 
         //PAUSED
-        //If the video is paused, it stop processing new frames and show the last rendered frame and the 
+        //If the video is paused, it stops processing new frames and show the last rendered frame and the 
         //same alpha that was computed when paused was triggered 
-        if (isPaused) {
+        if (isPaused) 
+        {
             shader->Use();
             glUniform1f(glGetUniformLocation(shader->programID, "uAlpha"), CalculateAlpha(pauseTime));
             renderer->Render(shader->programID, slot);
@@ -133,7 +167,8 @@ public:
 
         //If the current playback time "playPos" is ahead of the last displayed frame's timestamp (lastPTS),
         //it's time to decode a new frame
-        if (playPos > lastPTS) {
+        if (playPos > lastPTS) 
+        {
 
             //Ensures that the application successfully retrieves all the necessary data to 
             //produce a complete frame
