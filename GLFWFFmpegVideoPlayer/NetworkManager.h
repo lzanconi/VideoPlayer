@@ -182,28 +182,28 @@ private:
         }
     }
 
-    void HandleCommunication(SOCKET socket) 
-    {
-        // 25 FPS = 1 message every 40ms
-        const std::chrono::milliseconds frameDuration(40);
+    //void HandleCommunication(SOCKET socket) 
+    //{
+    //    // 25 FPS = 1 message every 40ms
+    //    const std::chrono::milliseconds frameDuration(40);
 
-        while (running) 
-        {
-            auto startTime = std::chrono::steady_clock::now();
+    //    while (running) 
+    //    {
+    //        auto startTime = std::chrono::steady_clock::now();
 
-            const char* msg = "FRAME_SYNC";
-            if (send(socket, msg, (int)strlen(msg), 0) == SOCKET_ERROR) 
-            {
-                break; // Connection lost, return to NetworkLoop to reconnect
-            }
+    //        const char* msg = "FRAME_SYNC";
+    //        if (send(socket, msg, (int)strlen(msg), 0) == SOCKET_ERROR) 
+    //        {
+    //            break; // Connection lost, return to NetworkLoop to reconnect
+    //        }
 
-            auto endTime = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    //        auto endTime = std::chrono::steady_clock::now();
+    //        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
 
-            if (elapsed < frameDuration) 
-            {
-                std::this_thread::sleep_for(frameDuration - elapsed);
-            }
-        }
-    }
+    //        if (elapsed < frameDuration) 
+    //        {
+    //            std::this_thread::sleep_for(frameDuration - elapsed);
+    //        }
+    //    }
+    //}
 };

@@ -2,7 +2,6 @@
 
 A **C++ FFMPEG + GLFW + GLAD Zero-Copy** video player for Intel integrated GPU and NVidia GPU on Windows
 
-
 ## Dependencies
 
  - Visual Studio 2022
@@ -38,11 +37,18 @@ C:\Libraries\ffmpeg\include<br>
 C:\Libraries\glad\include<br>
 <br>
 
-go to **C/C++** -> **Preprocessor**<br> 
-For **Preprocessor Definitions** set **WIN32_LEAN_AND_MEAN**<br><br>
+Open **project settings**, then go to **Linker** -> **General**<br> 
+For **Additional Library Directories** add the following directories:<br><br>
+C:\Libraries\glfw\lib-vc2022<br>
+C:\Libraries\ffmpeg\lib<br><br>
 
-go to **C/C++** -> **Language**<br> 
-For **C++ Language Standard** 
+
+## Build the program
+
+## Add Video folder
+Inside **x64\Debug** build folder, create a **Videos** folder and put your videos inside of it<br>
+
+
 
 
 
