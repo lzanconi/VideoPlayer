@@ -12,18 +12,37 @@ A **C++ FFMPEG + GLFW + GLAD Zero-Copy** video player for Intel integrated GPU a
 
 ## Visual Studio Setup
 
-**1.GLFW**
-Download **GLFW Windows pre-compiled binaries** [here](https://github.com/glfw/glfw/releases/download/3.4/glfw-3.4.bin.WIN64.zip)
+**1.GLFW**<br>
+Download **GLFW Windows pre-compiled binaries** [here](https://github.com/glfw/glfw/releases/download/3.4/glfw-3.4.bin.WIN64.zip)<br>
 Extract the content to a folder where we'll store all the required libraries (e.g. C:\Libraries\glfw)
 
-**2.GLAD**
-Go to GLAD2 generator [website](https://gen.glad.sh/)
-Configure the generator as follows:
-Under **gl** select **Version 4.6** and on the right, where it says **Compatibility** select **Core**
-Under **wgl** select **Version 1.0** 
-Under **Extensions** search for **WGL_NV_DX_interop** then click on `WGL_NV_DX_interop`
+**2.GLAD**<br>
+Go to GLAD2 generator [website](https://gen.glad.sh/)<br>
+Configure the generator as follows:<br>
+Under **gl** select **Version 4.6** and on the right, where it says **Compatibility** select **Core**<br>
+Under **wgl** select **Version 1.0**<br> 
+Under **Extensions** search for **WGL_NV_DX_interop** then click on `WGL_NV_DX_interop`<br>
 Under **Options** check **loader** 
-Click on **Generate** then download **glad.zip** file
+Click on **Generate** then download **glad.zip** file<br>
 Extract the content inside C:\Libraries\glad
 
-**3.FFmpeg**
+**3.FFmpeg**<br>
+Download **ffmpeg build for Windows** [here](https://www.gyan.dev/ffmpeg/builds/)<br>
+Extract the content to a folder where we'll store all the required libraries (e.g. C:\Libraries\ffmpeg)
+
+**4.Setup Visual Studio Include directories**
+Open **project settings**, then go to **C/C++** -> **General**<br> 
+For **Additional Include Directories** add the following directories:<br><br>
+C:\Libraries\glfw\include<br>
+C:\Libraries\ffmpeg\include<br>
+C:\Libraries\glad\include<br>
+<br>
+
+go to **C/C++** -> **Preprocessor**<br> 
+For **Preprocessor Definitions** set **WIN32_LEAN_AND_MEAN**<br><br>
+
+go to **C/C++** -> **Language**<br> 
+For **C++ Language Standard** 
+
+
+
