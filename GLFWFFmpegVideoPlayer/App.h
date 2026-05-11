@@ -182,6 +182,13 @@ private:
             state.sources[state.activeIndex]->Play(glfwGetTime());
         }
 
+        if (key == GLFW_KEY_UP)
+        {
+            state.activeIndex = 0;
+            state.sources[state.lastForegroundIndex]->Rewind();
+            std::cout << "Foreground stopped. Returning to background." << std::endl;
+        }
+
         if (key == GLFW_KEY_ENTER) {
             if (!state.sources.empty()) {
                 state.sources[0]->Play(glfwGetTime());

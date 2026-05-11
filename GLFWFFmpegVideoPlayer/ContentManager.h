@@ -61,6 +61,11 @@ public:
             videoContents.at(0).looped = true;
             videoContents.at(0).fadeInDuration = 0.0f;
             videoContents.at(0).fadeOutDuration = 0.0f;
+
+            videoContents.at(1).looped = true;
+            videoContents.at(1).fadeInDuration = 0.0f;
+            videoContents.at(1).fadeOutDuration = 0.0f;
+
             std::cout << "ContentManager: Loaded " << videoContents.size() << " videos." << std::endl;
         }
         catch (const fs::filesystem_error& e) {
