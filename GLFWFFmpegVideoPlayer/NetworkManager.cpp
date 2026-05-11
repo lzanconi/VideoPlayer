@@ -87,8 +87,13 @@ void NetworkManager::Run()
 void NetworkManager::HandlePositionSend(SOCKET socket)
 {
     // 25 FPS = 1 message every 40ms
-    const std::chrono::milliseconds frameDuration(40);
-    auto period_duration = frameDuration;
+    /*const std::chrono::milliseconds frameDuration(1000 / targetFramerate);
+    auto period_duration = frameDuration;*/
+
+    double targetFramerate = 60.0;
+    auto period_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::duration<double>(1.0 / targetFramerate)
+    );
 
     auto next_frame = std::chrono::steady_clock::now() + period_duration;
 
