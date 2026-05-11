@@ -197,6 +197,7 @@ void App::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int
     if (key == GLFW_KEY_F && state.renderer) 
         state.renderer->ToggleFullscreen();
 
+	//R key toggles a rotation effect in the shader for both background and foreground videos
     if (key == GLFW_KEY_R) 
     {
         state.isRotated = !state.isRotated;
