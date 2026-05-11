@@ -1,13 +1,13 @@
 #pragma once
 #include <vector>
+#include <cstdint>
 
 class VideoSource;
 
 class IApp {
 public:
-    virtual ~IApp() = default;
+    virtual ~IApp(); // Declaration only
 
-    // Define the specific data the NetworkManager needs
     virtual VideoSource* GetBackgroundVideo() = 0;
     virtual std::vector<float> GetPositions() = 0;
     virtual double GetLastPTS() = 0;

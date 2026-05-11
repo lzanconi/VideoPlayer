@@ -5,8 +5,6 @@
 #include "App.h"
 #include "ContentManager.h"
 
-AppState App::state;
-
 int main()
 {
 	try
@@ -18,8 +16,9 @@ int main()
 			{"3.mp4", 2.0f, 0.0f, false}
 		};*/
 
-
+		// Initialize the App with window dimensions and title
 		App app(1280, 720, "Video Player");
+		// Start the application's main loop
 		app.Run();
 	}
 	catch (const std::exception& e) {

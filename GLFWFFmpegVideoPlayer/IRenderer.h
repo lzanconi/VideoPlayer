@@ -3,7 +3,8 @@
 
 class IRenderer {
 public:
-    virtual ~IRenderer() = default;
+    // Virtual destructor declaration
+    virtual ~IRenderer();
 
     // Texture Updates
     virtual void UpdateVideoTextures(int slot, int w, int h, int lsY, uint8_t* dY, int lsUV, uint8_t* dUV) = 0;

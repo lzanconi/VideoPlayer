@@ -139,8 +139,16 @@ copy /y "$(ProjectDir)shader.frag" "$(OutDir)shader.frag"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="App.cpp" />
+    <ClCompile Include="ContentManager.cpp" />
     <ClCompile Include="gl.c" />
     <ClCompile Include="GLFWFFmpegVideoPlayer.cpp" />
+    <ClCompile Include="GLRenderer.cpp" />
+    <ClCompile Include="IApp.cpp" />
+    <ClCompile Include="IRenderer.cpp" />
+    <ClCompile Include="NetworkManager.cpp" />
+    <ClCompile Include="ShaderProgram.cpp" />
+    <ClCompile Include="VideoSource.cpp" />
     <ClCompile Include="wgl.c" />
   </ItemGroup>
   <ItemGroup>

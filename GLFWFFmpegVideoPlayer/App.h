@@ -1,210 +1,45 @@
 #pragma once
 #define WIN32_LEAN_AND_MEAN
-#include "NetworkManager.h"
 #include <windows.h>
-#include <iostream>
-#include <d3d11.h>
 #include <vector>
+#include <string>
+#include "IApp.h"
 #include "customtypes.h"
-#include "GLRenderer.h" 
-#include "ShaderProgram.h"
-#include "VideoSource.h"
-#include "ContentManager.h"
 
-
-// Note: We include GLRenderer.h only here in the implementation-heavy header 
-// or move the constructor logic to a .cpp to fully isolate the interface.
-
+// Forward declarations
+class IRenderer;
+class ShaderProgram;
+class VideoSource;
+class NetworkManager;
+struct AVBufferRef;
+struct AVPacket;
+struct AVFrame;
+struct GLFWwindow;
 
 class App : public IApp
 {
 public:
-    App(int width, int height, const std::string& title)
-    {
-        ContentManager contentMgr;
-        contentMgr.LoadVideoContentFromFolder(".\\Videos");
+    App(int width, int height, const std::string& title);
+    ~App();
 
-        if (contentMgr.GetVideoContents().empty()) {
-            std::cerr << "No .mp4 files found." << std::endl;
-        }
+    // IApp Interface Overrides
+    VideoSource* GetBackgroundVideo() override;
+    std::vector<float> GetPositions() override;
+    double GetLastPTS() override;
+    int64_t GetBGCaptureTimeNS() override;
 
-        // 1. Initialize the concrete Renderer but store it as the Interface
-        GLRenderer* concreteRenderer = new GLRenderer(width, height, title.c_str());
-        concreteRenderer->SetKeyCallback(App::KeyCallback);
-
-        renderer = concreteRenderer; // Assign to IRenderer*
-        state.renderer = renderer;
-
-        NetworkManager* networkMgr = new NetworkManager("127.0.0.1", 5555, this);
-        state.networkMgr = networkMgr;
-
-        
-
-        // 2. Load Shaders
-        videoShader = new ShaderProgram("shader.vert", "shader.frag");
-
-        // 3. Setup Hardware Acceleration
-        if (av_hwdevice_ctx_create(&hw_ctx, AV_HWDEVICE_TYPE_D3D11VA, NULL, NULL, 0) < 0) {
-            throw std::runtime_error("Failed to create HW Device Context");
-        }
-
-        // 4. Initialize Video Sources
-        for (const auto& videoContent : contentMgr.GetVideoContents())
-        {
-            VideoSource* videoSource = new VideoSource();
-            if (videoSource->Open(videoContent.filename, hw_ctx)) {
-                videoSource->SetFadeInDuration(videoContent.fadeInDuration);
-                videoSource->SetFadeOutDuration(videoContent.fadeOutDuration);
-                videoSource->SetLooped(videoContent.looped);
-                videoSource->positions = videoContent.positions;
-                state.sources.push_back(videoSource);
-            }
-            else {
-                delete videoSource;
-            }
-        }
-
-        // Automatically plays the background video
-        /*if (!state.sources.empty()) {
-            state.sources[0]->Play(glfwGetTime());
-        }*/
-
-        // 5. Allocate shared decoding buffers
-        pkt = av_packet_alloc();
-        frm = av_frame_alloc();
-        sw_frm = av_frame_alloc();
-
-        state.lastFPSUpdate = glfwGetTime();
-
-        state.networkMgr->Start();
-    }
-
-    ~App()
-    {
-        if (state.networkMgr)
-            delete state.networkMgr;
-        if (renderer) delete renderer;
-        if (videoShader) delete videoShader;
-        for (auto source : state.sources) delete source;
-        av_frame_free(&frm);
-        av_frame_free(&sw_frm);
-        av_packet_free(&pkt);
-        if (hw_ctx) av_buffer_unref(&hw_ctx);
-    }
-
-    VideoSource* GetBackgroundVideo() override {
-        if (state.sources.empty()) 
-            return nullptr;
-        
-        return state.sources[0]; // Returns background VideoSource
-    }
-
-    std::vector<float> GetPositions() override
-    {
-        return state.sources[0]->positions;
-    }
-
-    double GetLastPTS() override
-    {
-        return state.sources[0]->GetLastPTS();
-    }
-
-    int64_t GetBGCaptureTimeNS() override
-    {
-        return state.sources[0]->GetBGCaptureTimeNS();
-    }
-
-    void Run()
-    {
-        // Now using IRenderer interface methods
-        while (!renderer->ShouldClose()) {
-            renderer->PollEvents();
-
-            // 1. Handle Background (Always index 0, Slot 0)
-            state.sources[0]->UpdateAndRender(renderer, videoShader, frm, sw_frm, pkt, 0);
-
-            // 2. Handle Foreground Interrupts (Slot 1)
-            if (state.activeIndex != 0) {
-                VideoSource* foreground = state.sources[state.activeIndex];
-
-                if (!foreground->UpdateAndRender(renderer, videoShader, frm, sw_frm, pkt, 1)) {
-                    state.activeIndex = 0; // Return to background
-                }
-            }
-
-            renderer->SwapBuffers();
-
-            // FPS Tracking
-            state.frameCount++;
-            double currentTime = glfwGetTime();
-
-            if (currentTime - state.lastFPSUpdate >= 1.0) {
-                std::cout << "FPS: " << state.frameCount << std::endl;
-                state.frameCount = 0;
-                state.lastFPSUpdate = currentTime;
-            }
-        }
-    }
+    // Main execution loop
+    void Run();
 
 private:
-    static AppState state;
-    IRenderer* renderer; // Decoupled from GLRenderer
+    static AppState state; // Static state shared with callbacks
+    IRenderer* renderer;
     ShaderProgram* videoShader;
-    AVBufferRef* hw_ctx = nullptr;
-    AVPacket* pkt = nullptr;
-    AVFrame* frm = nullptr;
-    AVFrame* sw_frm = nullptr;
-    
+    AVBufferRef* hw_ctx;
+    AVPacket* pkt;
+    AVFrame* frm;
+    AVFrame* sw_frm;
 
-    static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-        if (action != GLFW_PRESS) return;
-
-        if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_LEFT) {
-            int dir = (key == GLFW_KEY_RIGHT) ? 1 : -1;
-            int numSources = (int)state.sources.size();
-
-            if (numSources <= 1) return;
-
-            int nextIdx;
-            if (state.lastForegroundIndex == 0) {
-                nextIdx = 1;
-            }
-            else {
-                nextIdx = state.lastForegroundIndex + dir;
-                if (nextIdx >= numSources) nextIdx = 1;
-                if (nextIdx < 1) nextIdx = numSources - 1;
-            }
-
-            state.activeIndex = nextIdx;
-            state.lastForegroundIndex = nextIdx;
-
-            state.sources[state.activeIndex]->Rewind();
-            state.sources[state.activeIndex]->Play(glfwGetTime());
-        }
-
-        if (key == GLFW_KEY_UP)
-        {
-            state.activeIndex = 0;
-            state.sources[state.lastForegroundIndex]->Rewind();
-            std::cout << "Foreground stopped. Returning to background." << std::endl;
-        }
-
-        if (key == GLFW_KEY_ENTER) {
-            if (!state.sources.empty()) {
-                state.sources[0]->Play(glfwGetTime());
-            }
-        }
-
-        if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, true);
-
-        if (key == GLFW_KEY_SPACE) {
-            double time = glfwGetTime();
-            state.sources[0]->Pause(time);
-            if (state.activeIndex != 0) {
-                state.sources[state.activeIndex]->Pause(time);
-            }
-        }
-
-        if (key == GLFW_KEY_F && state.renderer) state.renderer->ToggleFullscreen();
-    }
+    // Input handling
+    static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 };
