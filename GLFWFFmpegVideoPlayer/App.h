@@ -31,8 +31,10 @@ public:
     // Main execution loop
     void Run();
 
-private:
+public:
     static AppState state; // Static state shared with callbacks
+
+private:
     IRenderer* renderer;
     ShaderProgram* videoShader;
     AVBufferRef* hw_ctx;

@@ -197,6 +197,12 @@ void App::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int
     if (key == GLFW_KEY_F && state.renderer) 
         state.renderer->ToggleFullscreen();
 
+    if (key == GLFW_KEY_R) 
+    {
+        state.isRotated = !state.isRotated;
+        std::cout << "Rotation toggled: " << (state.isRotated ? "ON" : "OFF") << std::endl;
+	}
+
     //Escape key gracefully exits the application
     if (key == GLFW_KEY_ESCAPE)
         glfwSetWindowShouldClose(window, true);

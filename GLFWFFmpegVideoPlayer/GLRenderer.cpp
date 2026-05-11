@@ -1,5 +1,6 @@
 #include "GLRenderer.h"
 #include <iostream>
+#include "App.h"
 
 GLRenderer::GLRenderer(int width, int height, const char* title)
 {
@@ -117,6 +118,9 @@ void GLRenderer::Render(unsigned int shaderProgramID, int slot)
 
     //Activates the shader
     glUseProgram(shaderProgramID);
+
+    // Pass the rotation toggle to the shader
+    glUniform1i(glGetUniformLocation(shaderProgramID, "uRotated"), App::state.isRotated ? 1 : 0);
 
     //Map shader uniforms to correct texture units based on slot
     glUniform1i(glGetUniformLocation(shaderProgramID, "yTexture"), slot * 2);
