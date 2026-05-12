@@ -142,10 +142,14 @@ void GLRenderer::ToggleFullscreen()
         glfwGetWindowPos(window, &winX, &winY);
         glfwGetWindowSize(window, &winW, &winH);
         glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+        // Hide and lock the cursor to the window
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
     else 
     {
         glfwSetWindowMonitor(window, NULL, winX, winY, winW, winH, 0);
+        // Restore the cursor to normal visibility
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
     
     isFullscreen = !isFullscreen;
