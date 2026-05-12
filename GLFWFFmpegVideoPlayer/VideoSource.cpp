@@ -118,7 +118,7 @@ bool VideoSource::UpdateAndRender(IRenderer* renderer, ShaderProgram* shader, AV
         
         while (!frameCompleted) 
         {
-            //Fetches raw packet (compressed data) from FFmpeg format context
+			//Keeps fetching raw packet (compressed data) from FFmpeg format context until a frame is completely decoded and ready to be rendered
             if (av_read_frame(formatCtx, raw_packet) >= 0) 
             {
                 //Ensures the raw packet belongs to the video stream

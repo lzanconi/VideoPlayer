@@ -35,7 +35,7 @@ App::App(int width, int height, const std::string& title)
     state.renderer = renderer;
 
     // Setup Networking
-    state.networkMgr = new NetworkManager("127.0.0.1", 5555, this);
+    state.networkMgr = new NetworkManager("127.0.0.1", 15555, this);
 
     // Load Shaders
     videoShader = new ShaderProgram("shader.vert", "shader.frag");

@@ -83,9 +83,9 @@ void ContentManager::LoadVideoContentFromFolder(const std::string& folderPath)
             //Sets the first foreground candidate (index 1) to loop indefinitely
             videoContents.at(1).looped = true;
             //Disables fade-in for this foreground slot
-            videoContents.at(1).fadeInDuration = 0.0f;
+            videoContents.at(1).fadeInDuration = 2.0f;
             //Disables fade-out for this foreground slot
-            videoContents.at(1).fadeOutDuration = 0.0f;
+            videoContents.at(1).fadeOutDuration = 2.0f;
         }
 
         std::cout << "ContentManager: Loaded " << videoContents.size() << " videos." << std::endl;

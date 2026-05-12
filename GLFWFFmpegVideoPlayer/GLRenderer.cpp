@@ -7,6 +7,7 @@ GLRenderer::GLRenderer(int width, int height, const char* title)
     //Initializes the GLFW library; exits if initialization fails
     if (!glfwInit())
         exit(-1);
+    
 
     //Creates a windowed mode window and its OpenGL context
     window = glfwCreateWindow(width, height, title, NULL, NULL);
@@ -15,6 +16,8 @@ GLRenderer::GLRenderer(int width, int height, const char* title)
         glfwTerminate();
         exit(-1);
     }
+
+	ToggleFullscreen(); // Start in fullscreen mode
 
     //Make this window the current OpenGL context
     glfwMakeContextCurrent(window);
