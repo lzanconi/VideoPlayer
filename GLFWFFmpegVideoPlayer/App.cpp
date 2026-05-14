@@ -9,6 +9,7 @@
 
 extern "C" {
 #include <libavutil/hwcontext.h>
+#include <libavutil/hwcontext_d3d11va.h>
 #include <libavcodec/avcodec.h>
 }
 
@@ -16,8 +17,8 @@ extern "C" {
 AppState App::state;
 
 App::App(int width, int height, const std::string& title)
-    : renderer(nullptr), videoShader(nullptr), hw_ctx(nullptr),
-    pkt(nullptr), frm(nullptr), sw_frm(nullptr)
+: renderer(nullptr), videoShader(nullptr), hw_ctx(nullptr),
+pkt(nullptr), frm(nullptr)
 {
     // Load content from folder
     ContentManager contentMgr;
@@ -46,6 +47,14 @@ App::App(int width, int height, const std::string& title)
         throw std::runtime_error("Failed to create HW Device Context");
     }
 
+    // Extract the underlying D3D11 device and context from the FFmpeg hardware device context
+    // and hand them to the renderer to initialize the WGL_NV_DX_interop2 layer
+    {
+        auto* hwFramesCtx = reinterpret_cast<AVHWDeviceContext*>(hw_ctx->data);
+        auto* d3d11DevCtx = reinterpret_cast<AVD3D11VADeviceContext*>(hwFramesCtx->hwctx);
+        renderer->InitDXInterop(d3d11DevCtx->device, d3d11DevCtx->device_context);
+    }
+
     // Initialize Video Sources from content
     for (const auto& videoContent : contentMgr.GetVideoContents()) 
     {
@@ -67,7 +76,6 @@ App::App(int width, int height, const std::string& title)
     // Allocate shared FFmpeg buffers
     pkt = av_packet_alloc();
     frm = av_frame_alloc();
-    sw_frm = av_frame_alloc();
 
     state.lastFPSUpdate = glfwGetTime();
     state.networkMgr->Start();
@@ -85,7 +93,6 @@ App::~App()
         delete source;
 
     av_frame_free(&frm);
-    av_frame_free(&sw_frm);
     av_packet_free(&pkt);
     if (hw_ctx) 
         av_buffer_unref(&hw_ctx);
@@ -119,13 +126,13 @@ void App::Run()
         renderer->PollEvents();
 
         // Update Background (Slot 0)
-        state.sources[0]->UpdateAndRender(renderer, videoShader, frm, sw_frm, pkt, 0);
+        state.sources[0]->UpdateAndRender(renderer, videoShader, frm, pkt, 0);
 
         // Update Foreground if active (Slot 1)
         if (state.activeIndex != 0) 
         {
             VideoSource* foreground = state.sources[state.activeIndex];
-            if (!foreground->UpdateAndRender(renderer, videoShader, frm, sw_frm, pkt, 1)) 
+            if (!foreground->UpdateAndRender(renderer, videoShader, frm, pkt, 1)) 
             {
                 state.activeIndex = 0; // Return to background on completion
             }

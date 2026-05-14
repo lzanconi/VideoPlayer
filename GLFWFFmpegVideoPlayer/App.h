@@ -15,6 +15,8 @@ struct AVBufferRef;
 struct AVPacket;
 struct AVFrame;
 struct GLFWwindow;
+struct ID3D11Device;
+struct ID3D11DeviceContext;
 
 class App : public IApp
 {
@@ -40,7 +42,6 @@ private:
     AVBufferRef* hw_ctx;
     AVPacket* pkt;
     AVFrame* frm;
-    AVFrame* sw_frm;
 
     // Input handling
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);

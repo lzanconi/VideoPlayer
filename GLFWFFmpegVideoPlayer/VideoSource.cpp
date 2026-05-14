@@ -10,7 +10,6 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/hwcontext.h>
-#include <libavutil/imgutils.h>
 }
 
 VideoSource::VideoSource() : bg_capture_time_ns(0) {}
@@ -76,7 +75,7 @@ bool VideoSource::Open(const std::string& file, AVBufferRef* hwDeviceCtx)
 * It is the central "engine" of each video stream.
 * It manages playback timing, handles the decoding of raw packets into frames, and triggers the final render for a specific video layer.
 */
-bool VideoSource::UpdateAndRender(IRenderer* renderer, ShaderProgram* shader, AVFrame* gpu_frame, AVFrame* cpu_frame, AVPacket* raw_packet, int slot) 
+bool VideoSource::UpdateAndRender(IRenderer* renderer, ShaderProgram* shader, AVFrame* gpu_frame, AVPacket* raw_packet, int slot) 
 {
     //Check if the video source has been successfully opened
     if (!isInitialized) 
@@ -130,15 +129,16 @@ bool VideoSource::UpdateAndRender(IRenderer* renderer, ShaderProgram* shader, AV
                     //Attempts to pull a decoded YUV frame from the decoder
                     if (avcodec_receive_frame(codecCtx, gpu_frame) >= 0)
                     {
-                        //Copy the frame from the GPU hardware decoder memory (gpu_frame) to software-accessible buffer (cpu_frame)
-                        av_hwframe_transfer_data(cpu_frame, gpu_frame, 0);
-
-                        //Sends the raw Y (luminance) and UV (chrominance) data to the OpenGL renderer to update
-                        //the textures for the specific slot
-                        renderer->UpdateVideoTextures(slot,
-                            cpu_frame->width, cpu_frame->height,
-                            cpu_frame->linesize[0], cpu_frame->data[0],
-                            cpu_frame->linesize[1], cpu_frame->data[1]
+                        // The decoded NV12 frame lives in a D3D11 texture array.
+                        // gpu_frame->data[0] is the ID3D11Texture2D* and
+                        // gpu_frame->data[1] is the array slice index (cast to intptr_t).
+                        // Passing them directly to the renderer keeps the frame entirely on the GPU.
+                        renderer->UpdateVideoTexturesFromD3D(
+                            slot,
+                            gpu_frame->data[0],
+                            (int)(intptr_t)gpu_frame->data[1],
+                            gpu_frame->width,
+                            gpu_frame->height
                         );
 
                         //Updates "lastPts" to the current position and exits the loop because the current frame 

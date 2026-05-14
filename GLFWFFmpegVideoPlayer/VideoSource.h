@@ -50,7 +50,7 @@ public:
     void Play(double currentGLFWTime);
 
     // Main update loop: decodes and renders frames
-    bool UpdateAndRender(IRenderer* renderer, ShaderProgram* shader, AVFrame* frm, AVFrame* sw_frm, AVPacket* pkt, int slot);
+    bool UpdateAndRender(IRenderer* renderer, ShaderProgram* shader, AVFrame* frm, AVPacket* pkt, int slot);
 
     // Toggles pause state
     void Pause(double currentGLFWTime);
